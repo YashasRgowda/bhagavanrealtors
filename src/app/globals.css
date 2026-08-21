@@ -1,26 +1,278 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════
+   Bhagvan Realtors — Premium monochrome design system
+   Light mode only. Ink on paper. No colour except restrained
+   signal red for destructive actions and errors.
+   ═══════════════════════════════════════════════════════════ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  /* ── Surfaces ── */
+  --background: #fafaf9;        /* warm paper */
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --muted: #f4f4f2;
+  --muted-foreground: #74746e;
+
+  /* ── Ink ── */
+  --foreground: #0a0a0a;        /* near-black, softer than #000 */
+  --faint: #a1a19b;
+
+  /* ── Lines ── */
+  --border: #e8e8e4;            /* hairline */
+  --border-strong: #d5d5cf;
+  --input: #dcdcd6;
+  --ring: #0a0a0a;
+
+  /* ── Brand: black is the accent ── */
+  --primary: #0a0a0a;
+  --primary-foreground: #ffffff;
+  --accent: #1a1a18;
+  --accent-foreground: #ffffff;
+
+  /* ── Signals: monochrome, with one restrained red ── */
+  --success: #0a0a0a;
+  --warning: #6c6c66;
+  --danger: #9e1c1c;
+
+  --radius: 0.625rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--faint);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
+
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-display);
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Whisper-soft elevation — premium interfaces barely cast shadows */
+  --shadow-2xs: 0 1px 1px rgb(10 10 10 / 0.03);
+  --shadow-xs: 0 1px 2px rgb(10 10 10 / 0.04);
+  --shadow-sm: 0 1px 2px rgb(10 10 10 / 0.04), 0 1px 1px rgb(10 10 10 / 0.02);
+  --shadow-md: 0 4px 12px -4px rgb(10 10 10 / 0.08), 0 2px 4px -2px rgb(10 10 10 / 0.04);
+  --shadow-lg: 0 12px 28px -12px rgb(10 10 10 / 0.14), 0 4px 8px -4px rgb(10 10 10 / 0.06);
+  --shadow-xl: 0 24px 48px -16px rgb(10 10 10 / 0.18);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Base ─────────────────────────────────────────────────── */
+
+html,
+body {
+  height: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1, "ss01" 1;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+/* Headings sit tighter than body text — the single biggest "premium" tell */
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.024em;
+}
+
+/* ── Type utilities ───────────────────────────────────────── */
+
+/* Editorial serif — reserved for brand marks, page titles and prices */
+.font-display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
+/* Small all-caps label above a heading */
+.eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* Aligned digits for money columns and spec tables */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ── Focus ────────────────────────────────────────────────── */
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+/* ── Form controls ────────────────────────────────────────── */
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  letter-spacing: inherit;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--foreground);
+  cursor: pointer;
+}
+
+/* Native select arrow, drawn in ink instead of the OS blue-grey */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%230a0a0a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.25rem;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.45;
+  cursor: pointer;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* ── Layout helpers ───────────────────────────────────────── */
+
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+}
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top), 0.5rem);
+}
+
+/* Hairline rule that fades at both ends — used between page sections */
+.rule-fade {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-strong) 18%, var(--border-strong) 82%, transparent);
+}
+
+/* ── Motion ───────────────────────────────────────────────── */
+
+.lift {
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 240ms ease;
+}
+.lift:hover {
+  transform: translateY(-2px);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-fade-up {
+  animation: fade-up 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-scale-in {
+  animation: scale-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .lift:hover {
+    transform: none;
+  }
+}
+
+/* ── Scrollbars ───────────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+  background-clip: content-box;
+}
+
+/* ── Print (deal reports) ─────────────────────────────────── */
+
+@media print {
+  body {
+    background: #fff;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
 }

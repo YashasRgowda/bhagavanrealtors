@@ -1,0 +1,40 @@
+export type PropertyRow = {
+  id: string;
+  owner_user_id: string;
+  transaction_type: "sale" | "rent" | "lease";
+  category: "residential" | "commercial" | "land";
+  property_type: string;
+  title: string | null;
+  description: string | null;
+  city: string | null;
+  locality: string | null;
+  address_text: string | null;
+  pincode: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  price: number | null;
+  price_unit: string | null;
+  deposit: number | null;
+  is_negotiable: boolean | null;
+  area_value: number | null;
+  area_unit: string | null;
+  bhk: string | null;
+  status: "available"|"negotiating"|"token"|"sold"|"rented"|"leased"|"parked"|"withdrawn";
+  source: "walkin"|"agent_tip"|"online"|"other" | null;
+  is_featured: boolean;
+  attributes: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+};
+
+export type PropertyMediaRow = {
+  id: string;
+  property_id: string;
+  type: "image" | "video";
+  storage_path: string;
+  url: string;
+  thumb_url: string | null;
+  sort_order: number;
+  is_cover: boolean;
+};
