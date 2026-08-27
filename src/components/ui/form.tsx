@@ -3,11 +3,64 @@ import { cn } from "@/lib/utils";
 import { Label } from "./label";
 
 /**
- * Shared form building blocks so every form in the app — the add wizard, the
- * edit screen, the deal pipeline, the dialogs — reads the same way.
+ * Shared form building blocks.
+ *
+ * Tuned for the person actually filling these in: a dealer in his fifties,
+ * often standing outside a building, in a hurry. That drives three choices —
+ * every section announces itself with an icon and a plain-language sentence,
+ * required fields are unmistakable, and optional detail is visibly demoted so
+ * the eye can skip it without wondering whether it mattered.
  */
 
-/** A titled block of fields with a hairline rule under the heading. */
+/* ───────────────────────── section card ───────────────────────── */
+
+/**
+ * A titled step of a form. Owns its own card, so sections read as separate
+ * chapters instead of blurring into one long scroll behind hairline rules.
+ */
+export function FormCard({
+  icon,
+  title,
+  description,
+  aside,
+  children,
+  className,
+}: {
+  icon?: React.ReactNode;
+  title: string;
+  /** One plain sentence. Never jargon — this is the bit that gets read. */
+  description?: string;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("rounded-lg border border-line bg-elevated shadow-sm", className)}>
+      <header className="flex items-start gap-3.5 border-b border-line p-5 sm:px-6">
+        {icon && (
+          <span
+            className="grid size-10 shrink-0 place-items-center rounded-md bg-accent-subtle text-accent-text [&_svg]:size-5"
+            aria-hidden
+          >
+            {icon}
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <h2 className="text-h3 text-ink">{title}</h2>
+          {description && (
+            <p className="mt-1 text-sm text-ink-muted">{description}</p>
+          )}
+        </div>
+        {aside && <div className="shrink-0">{aside}</div>}
+      </header>
+      {/* Blocks inside a card need real separation — without a gap the
+          required row sits flush against the optional well below it. */}
+      <div className="flex flex-col gap-7 p-5 sm:p-6">{children}</div>
+    </section>
+  );
+}
+
+/** A titled block of fields *inside* a card. */
 export function FormSection({
   title,
   description,
@@ -20,11 +73,11 @@ export function FormSection({
   className?: string;
 }) {
   return (
-    <section className={cn("space-y-4", className)}>
-      <div className="border-b border-border pb-3">
-        <h3 className="eyebrow">{title}</h3>
+    <section className={cn("flex flex-col gap-4", className)}>
+      <div>
+        <h3 className="text-sm font-semibold text-ink">{title}</h3>
         {description && (
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{description}</p>
+          <p className="mt-1 text-sm text-ink-muted">{description}</p>
         )}
       </div>
       {children}
@@ -32,16 +85,52 @@ export function FormSection({
   );
 }
 
-/** Responsive field grid. Fields opt into full width with `className="sm:col-span-2"`. */
-export function FormGrid({
+/**
+ * Optional extras, visibly demoted.
+ *
+ * Nothing is hidden — a dealer who wants to record the facing shouldn't have
+ * to hunt for it — but the tinted well and quieter heading make it obvious at
+ * a glance which fields he can skip and still save.
+ */
+export function FieldGroup({
+  title,
   children,
   className,
 }: {
+  title: string;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <div className={cn("grid gap-x-4 gap-y-4 sm:grid-cols-2", className)}>{children}</div>
+    <div className={cn("rounded-md border border-line-subtle bg-subtle p-5", className)}>
+      <p className="text-micro uppercase text-ink-muted">{title}</p>
+      <div className="mt-5">{children}</div>
+    </div>
+  );
+}
+
+/* ───────────────────────────── fields ───────────────────────────── */
+
+/** Responsive field grid. Stacks below `xs` so a 344px screen never cramps. */
+export function FormGrid({
+  children,
+  className,
+  cols = 2,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  cols?: 2 | 3;
+}) {
+  return (
+    <div
+      className={cn(
+        "grid gap-x-5 gap-y-7",
+        cols === 3 ? "xs:grid-cols-2 sm:grid-cols-3" : "sm:grid-cols-2",
+        className,
+      )}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -49,6 +138,7 @@ export function FormGrid({
 export function Field({
   label,
   required,
+  optional,
   hint,
   error,
   htmlFor,
@@ -57,6 +147,8 @@ export function Field({
 }: {
   label: string;
   required?: boolean;
+  /** Renders a quiet "optional" tag — use where skipping isn't obvious. */
+  optional?: boolean;
   hint?: React.ReactNode;
   error?: string | null;
   htmlFor?: string;
@@ -64,16 +156,22 @@ export function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("min-w-0 space-y-1.5", className)}>
-      <Label htmlFor={htmlFor}>
-        {label}
-        {required && <span className="ml-0.5 text-[color:var(--danger)]">*</span>}
+    <div className={cn("flex min-w-0 flex-col gap-2", className)}>
+      <Label htmlFor={htmlFor} className="flex items-baseline gap-1.5">
+        <span>{label}</span>
+        {required && (
+          <span className="text-danger-text" aria-hidden>*</span>
+        )}
+        {required && <span className="sr-only">(required)</span>}
+        {optional && (
+          <span className="text-xs font-normal text-ink-subtle">optional</span>
+        )}
       </Label>
       {children}
       {error ? (
-        <p className="text-xs text-[color:var(--danger)]">{error}</p>
+        <p className="text-sm text-danger-text">{error}</p>
       ) : hint ? (
-        <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>
+        <p className="text-sm text-ink-muted">{hint}</p>
       ) : null}
     </div>
   );
@@ -102,10 +200,11 @@ export function ToggleRow({
   return (
     <label
       className={cn(
-        "flex cursor-pointer items-start gap-3 rounded-lg border p-3.5 transition-all duration-200",
+        "flex min-h-14 cursor-pointer items-start gap-3 rounded-md border p-5",
+        "transition-[background-color,border-color] duration-160 ease-out-expo",
         checked
-          ? "border-foreground bg-muted/50"
-          : "border-border bg-card hover:border-foreground/30 hover:bg-muted/25",
+          ? "border-accent bg-accent-subtle"
+          : "border-line bg-elevated hover:border-line-strong hover:bg-subtle",
         className,
       )}
     >
@@ -113,16 +212,14 @@ export function ToggleRow({
         type="checkbox"
         checked={checked}
         onChange={e => onChange(e.target.checked)}
-        className="mt-px h-[1.125rem] w-[1.125rem] shrink-0"
+        className="mt-0.5 size-5 shrink-0"
       />
       <span className="min-w-0 leading-snug">
-        <span className="text-[0.8125rem] font-medium">
+        <span className="text-sm font-medium text-ink">
           {label}
-          {required && <span className="ml-0.5 text-[color:var(--danger)]">*</span>}
+          {required && <span className="ml-0.5 text-danger-text" aria-hidden>*</span>}
         </span>
-        {hint && (
-          <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{hint}</span>
-        )}
+        {hint && <span className="mt-1 block text-sm text-ink-muted">{hint}</span>}
       </span>
     </label>
   );
@@ -145,11 +242,11 @@ export function RevealPanel({
   return (
     <div
       className={cn(
-        "animate-fade-up rounded-lg border border-border bg-muted/30 p-4",
+        "animate-fade-up rounded-md border border-accent-line bg-accent-subtle/40 p-5",
         className,
       )}
     >
-      <p className="eyebrow mb-4">{title}</p>
+      <p className="text-micro mb-4 uppercase text-ink-muted">{title}</p>
       <FormGrid>{children}</FormGrid>
     </div>
   );

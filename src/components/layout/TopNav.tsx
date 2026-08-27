@@ -2,41 +2,58 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Plus, Archive, User } from "lucide-react";
+import { motion } from "motion/react";
+import { SPRING, useMotionPrefs } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 const items = [
-  { href: "/properties",        label: "Live",     icon: Home    },
-  { href: "/properties/new",    label: "Add",      icon: Plus    },
-  { href: "/properties/parked", label: "Archive",  icon: Archive },
-  { href: "/settings",          label: "Settings", icon: User    },
+  { href: "/properties",        label: "Live"     },
+  { href: "/requirements",      label: "Buyers"   },
+  { href: "/properties/parked", label: "Archive"  },
+  { href: "/settings",          label: "Settings" },
 ];
 
+/**
+ * Desktop navigation.
+ *
+ * The active marker is a rule sitting on the header's own bottom border, so
+ * the nav reads as part of the bar rather than as a control floating inside
+ * it — which is what made the previous centred pill feel bolted on.
+ */
 export function TopNav() {
   const pathname = usePathname();
+  const m = useMotionPrefs();
+
   return (
-    <nav className="hidden md:block">
-      <ul className="flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-2xs">
-        {items.map(({ href, label, icon: Icon }) => {
+    <nav aria-label="Main" className="hidden h-full md:block">
+      <ul className="flex h-full items-stretch">
+        {items.map(({ href, label }) => {
           const active =
             href === "/properties"
               ? pathname === "/properties"
               : pathname === href || pathname.startsWith(href + "/");
           return (
-            <li key={href}>
+            <li key={href} className="relative flex">
               <Link
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[0.8125rem] font-medium tracking-[-0.005em] transition-colors duration-200",
-                  active
-                    ? "bg-foreground text-background"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  "relative flex h-full items-center px-4 text-sm font-medium",
+                  "transition-colors duration-160 ease-out-expo",
+                  "focus-visible:outline-2 focus-visible:focus-inset focus-visible:outline-ring",
+                  active ? "text-ink" : "text-ink-muted hover:text-ink",
                 )}
               >
-                <Icon className="h-[0.9375rem] w-[0.9375rem]" />
                 {label}
               </Link>
+              {active && (
+                <motion.span
+                  layoutId={m.animate ? "top-nav-underline" : undefined}
+                  transition={SPRING}
+                  className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-accent"
+                  aria-hidden
+                />
+              )}
             </li>
           );
         })}

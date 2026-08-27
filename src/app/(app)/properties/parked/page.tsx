@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { PropertyCard } from "@/components/property/PropertyCard";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { CatalogueGrid } from "@/components/property/CatalogueGrid";
+import { CatalogueCount } from "@/components/property/CatalogueCount";
+import { EmptyState } from "@/components/ui/empty-state";
 import { CLOSED_STATUSES } from "@/lib/property/enums";
 import { Archive } from "lucide-react";
 import type { PropertyRow, PropertyMediaRow } from "@/lib/property/types";
@@ -25,35 +26,37 @@ export default async function ParkedPage() {
         .in("property_id", ids)
         .order("sort_order", { ascending: true })
     : { data: [] as PropertyMediaRow[] };
-  const coverByProp = new Map<string, PropertyMediaRow>();
+
+  const coverByProp: Record<string, PropertyMediaRow> = {};
   for (const m of (media ?? []) as PropertyMediaRow[]) {
-    if (!coverByProp.has(m.property_id) || m.is_cover) coverByProp.set(m.property_id, m);
+    if (!coverByProp[m.property_id] || m.is_cover) coverByProp[m.property_id] = m;
   }
 
   return (
-    <div className="space-y-7">
-      <PageHeader
-        eyebrow="Archive"
-        title="Closed & parked"
-        description="Sold, rented, leased or parked. Nothing here is deleted — reactivate any property at any time."
-      />
+    <div className="flex flex-col gap-8 md:gap-10">
+      <header className="min-w-0">
+        <p className="text-micro uppercase text-ink-muted">Archive</p>
+        <h1 className="mt-3 text-h1 text-ink">Closed &amp; parked</h1>
+        <p className="mt-2 max-w-xl text-sm text-ink-muted">
+          {list.length > 0 ? (
+            <>
+              <CatalogueCount value={list.length} singular="property" plural="properties" />
+              {" sold, rented, leased or parked. Nothing here is deleted — reactivate any of them at any time."}
+            </>
+          ) : (
+            "Sold, rented, leased or parked. Nothing here is deleted — reactivate any property at any time."
+          )}
+        </p>
+      </header>
 
       {list.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border-strong bg-card px-6 py-16 text-center">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-muted text-muted-foreground">
-            <Archive className="h-5 w-5" strokeWidth={1.75} />
-          </div>
-          <p className="mt-5 font-display text-xl">Nothing archived yet</p>
-          <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
-            Properties land here the moment a deal closes or you park them.
-          </p>
-        </div>
+        <EmptyState
+          icon={<Archive className="size-6" strokeWidth={1.75} aria-hidden />}
+          title="Nothing archived yet"
+          description="Properties land here the moment a deal closes or you park them."
+        />
       ) : (
-        <div className="grid grid-cols-2 gap-3.5 md:grid-cols-3 md:gap-5 xl:grid-cols-4">
-          {list.map(p => (
-            <PropertyCard key={p.id} p={p} cover={coverByProp.get(p.id) ?? null} />
-          ))}
-        </div>
+        <CatalogueGrid items={list} covers={coverByProp} />
       )}
     </div>
   );

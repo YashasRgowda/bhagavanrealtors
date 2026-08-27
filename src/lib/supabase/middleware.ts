@@ -8,9 +8,30 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  // Without these, createServerClient throws and the middleware crashes — which
+  // surfaces as a bare MIDDLEWARE_INVOCATION_FAILED 500 on *every* route with no
+  // hint as to why. Fail loudly and specifically instead.
+  //
+  // Deliberately does NOT fall through to the app: with no Supabase client we
+  // cannot verify a session, so continuing would serve gated pages to anyone.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    const missing = [
+      !supabaseUrl && "NEXT_PUBLIC_SUPABASE_URL",
+      !supabaseAnonKey && "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    ].filter(Boolean).join(" and ");
+    return new NextResponse(
+      `Server misconfigured: ${missing} is not set.\n\n` +
+        `Add it under Vercel → Project → Settings → Environment Variables, ` +
+        `then redeploy (existing deployments do not pick up new variables).`,
+      { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } },
+    );
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {

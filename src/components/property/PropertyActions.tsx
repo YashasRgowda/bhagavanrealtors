@@ -4,23 +4,38 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Money } from "@/components/ui/money";
 import { RentCloseDialog } from "./RentCloseDialog";
-import { DeletePropertyButton } from "./DeletePropertyButton";
+import { PosterStudio } from "./PosterStudio";
 import { ShareComposer } from "@/components/share/ShareComposer";
-import { Briefcase, Home, RefreshCw, Loader2, Share2, Pencil } from "lucide-react";
+import { formatINR } from "@/lib/format/currency";
+import { Briefcase, Home, RefreshCw, Share2, Pencil, Sparkles } from "lucide-react";
 import type { PropertyRow, PropertyMediaRow } from "@/lib/property/types";
 
+/**
+ * Price and what you can do about it.
+ *
+ * These five actions used to be five identical full-width buttons stacked in
+ * one column, which said they were five equal choices. They are not: one moves
+ * the deal forward, two put the listing in front of buyers, one is maintenance,
+ * and one is irreversible. The layout now says that — a single solid primary,
+ * a paired row for the outbound tools, a quiet link for editing. Delete has
+ * left this stack entirely; it lives in its own zone at the foot of the page,
+ * so it can never be the button you hit while reaching for Edit.
+ */
 export function PropertyActions({
-  prop, media, hasDeal = false, shareCount = 0,
+  prop, media, brandName = "", brandPhone = null,
 }: {
   prop: PropertyRow;
   media: PropertyMediaRow[];
-  hasDeal?: boolean;
-  shareCount?: number;
+  brandName?: string;
+  brandPhone?: string | null;
 }) {
   const router = useRouter();
   const [showClose, setShowClose] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showPoster, setShowPoster] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function reactivate() {
@@ -35,57 +50,85 @@ export function PropertyActions({
   const isParked = prop.status === "parked";
   const isSold = prop.status === "sold";
 
+  const priceLabel =
+    prop.transaction_type === "rent" ? "Monthly rent"
+    : prop.transaction_type === "lease" ? "Lease amount"
+    : "Asking price";
+
   return (
     <>
-      <div className="flex flex-col gap-2.5">
-        {isSale && (
-          <Link href={`/properties/${prop.id}/deal`} className="block">
-            <Button variant={isSold ? "outline" : "default"} size="lg" className="w-full">
-              <Briefcase className="h-4 w-4" />
-              {isSold ? "View deal summary" : "Open deal pipeline"}
+      <Card className="overflow-hidden">
+        {/* ── Price ── */}
+        <div className="border-b border-line bg-subtle px-5 py-5">
+          <p className="text-micro uppercase text-ink-muted">{priceLabel}</p>
+          {prop.price ? (
+            <>
+              <p className="mt-2 text-display text-ink">
+                <Money rupees={prop.price} suffix={prop.transaction_type === "rent" ? "/mo" : undefined} />
+              </p>
+              <p className="mt-1.5 text-sm text-ink-muted">
+                {formatINR(prop.price)}
+                {prop.is_negotiable && isSale ? " · Negotiable" : ""}
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-h2 text-ink-subtle">On request</p>
+          )}
+        </div>
+
+        {/* ── Actions ── */}
+        <div className="flex flex-col gap-2.5 p-5">
+          {isSale && (
+            <Link href={`/properties/${prop.id}/deal`} className="block">
+              <Button variant={isSold ? "outline" : "primary"} size="lg" block>
+                <Briefcase aria-hidden />
+                {isSold ? "View deal summary" : "Open deal pipeline"}
+              </Button>
+            </Link>
+          )}
+
+          {isRentLike && !isParked && (
+            <Button size="lg" block onClick={() => setShowClose(true)}>
+              <Home aria-hidden />
+              Mark as {prop.transaction_type === "lease" ? "Leased" : "Rented"}
+            </Button>
+          )}
+
+          {isRentLike && isParked && (
+            <Button size="lg" block onClick={reactivate} loading={busy}>
+              <RefreshCw aria-hidden /> Vacant again · Re-list
+            </Button>
+          )}
+
+          {/* Siblings — both put the listing in front of a buyer. */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <Button variant="outline" size="lg" onClick={() => setShowShare(true)}>
+              <Share2 aria-hidden /> Share
+            </Button>
+            <Button variant="outline" size="lg" onClick={() => setShowPoster(true)}>
+              <Sparkles aria-hidden /> Poster
+            </Button>
+          </div>
+
+          <Link href={`/properties/${prop.id}/edit`} className="block">
+            <Button variant="ghost" size="lg" block>
+              <Pencil aria-hidden /> Edit listing &amp; photos
             </Button>
           </Link>
-        )}
-
-        {isRentLike && !isParked && (
-          <Button size="lg" className="w-full" onClick={() => setShowClose(true)}>
-            <Home className="h-4 w-4" />
-            Mark as {prop.transaction_type === "lease" ? "Leased" : "Rented"}
-          </Button>
-        )}
-
-        {isRentLike && isParked && (
-          <Button size="lg" className="w-full" onClick={reactivate} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Vacant again / Re-list
-          </Button>
-        )}
-
-        <Button variant="outline" size="lg" className="w-full" onClick={() => setShowShare(true)}>
-          <Share2 className="h-4 w-4" /> Share listing
-        </Button>
-
-        <Link href={`/properties/${prop.id}/edit`} className="block">
-          <Button variant="ghost" size="lg" className="w-full">
-            <Pencil className="h-4 w-4" /> Edit listing &amp; photos
-          </Button>
-        </Link>
-
-        <div className="rule-fade my-1" />
-
-        <DeletePropertyButton
-          propertyId={prop.id}
-          title={prop.title || "This property"}
-          mediaCount={media.length}
-          hasDeal={hasDeal}
-          shareCount={shareCount}
-        />
-      </div>
+        </div>
+      </Card>
 
       {showShare && (
         <ShareComposer propertyId={prop.id} media={media} onClose={() => setShowShare(false)} />
       )}
-
+      {showPoster && (
+        <PosterStudio
+          prop={prop}
+          brandName={brandName || "Bhagvan Realtors"}
+          brandPhone={brandPhone}
+          onClose={() => setShowPoster(false)}
+        />
+      )}
       {showClose && isRentLike && (
         <RentCloseDialog
           propertyId={prop.id}

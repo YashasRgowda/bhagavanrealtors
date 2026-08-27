@@ -1,33 +1,29 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Elevation is meaningful, not decorative: resting = sm, interactive hover =
+ * md, sheets = lg, modals = xl. Nothing picks a shadow for looks.
+ */
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn(
-        "rounded-xl border border-border bg-card text-card-foreground shadow-xs",
-        className,
-      )}
+      className={cn("rounded-lg border border-line bg-elevated text-ink shadow-sm", className)}
       {...props}
     />
   );
 }
 
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col space-y-1.5 p-5", className)} {...props} />;
+  return <div className={cn("flex flex-col gap-1.5 p-5", className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return (
-    <h3
-      className={cn("text-[0.9375rem] font-semibold leading-tight tracking-[-0.02em]", className)}
-      {...props}
-    />
-  );
+  return <h3 className={cn("text-h3", className)} {...props} />;
 }
 
 export function CardDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn("text-sm leading-relaxed text-muted-foreground", className)} {...props} />;
+  return <p className={cn("text-sm text-ink-muted", className)} {...props} />;
 }
 
 export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

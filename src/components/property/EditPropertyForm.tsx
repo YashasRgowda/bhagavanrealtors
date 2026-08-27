@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormCard } from "@/components/ui/form";
+import { Image as ImageIcon } from "lucide-react";
 import { DetailsForm } from "@/components/wizard/DetailsForm";
 import { MediaManager } from "./MediaManager";
 import { initialWizardState, type WizardState } from "@/components/wizard/types";
@@ -162,44 +163,30 @@ export function EditPropertyForm({
   }
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="flex flex-col gap-5 pb-24">
       {/* ── Photos & video ── */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="eyebrow">Photos &amp; video</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Hover a tile to make it the cover or delete it. Deleting removes the file permanently.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <MediaManager propertyId={prop.id} media={media} />
-        </CardContent>
-      </Card>
+      <FormCard
+        icon={<ImageIcon strokeWidth={1.75} />}
+        title="Photos & video"
+        description="The first photo is the cover. Deleting one removes the file for good."
+      >
+        <MediaManager propertyId={prop.id} media={media} />
+      </FormCard>
 
       {/* ── Details ── */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="eyebrow">Listing details</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Price, area, location and the private owner contact.
-          </p>
-        </CardHeader>
-        <CardContent className="pt-1">
-          <DetailsForm state={state} set={set} propertyId={prop.id} />
-        </CardContent>
-      </Card>
+      <DetailsForm state={state} set={set} propertyId={prop.id} />
 
       {errs.length > 0 && (
-        <div className="rounded-lg border border-[color:var(--danger)]/25 bg-[color:var(--danger)]/5 p-4 text-sm">
-          <p className="font-medium text-[color:var(--danger)]">Fix these before saving</p>
-          <ul className="mt-2 space-y-1 text-[color:var(--danger)]/85">
+        <div className="rounded-lg border border-danger/30 bg-danger-subtle p-4 text-sm">
+          <p className="font-medium text-danger-text">Fix these before saving</p>
+          <ul className="mt-2 space-y-1 text-danger-text">
             {errs.map(e => <li key={e}>· {e}</li>)}
           </ul>
         </div>
       )}
 
       {err && (
-        <p className="rounded-md border border-[color:var(--danger)]/25 bg-[color:var(--danger)]/5 px-3 py-2.5 text-sm text-[color:var(--danger)]">
+        <p className="rounded-md border border-danger/30 bg-danger-subtle px-3 py-2.5 text-sm text-danger-text">
           {err}
         </p>
       )}
@@ -209,13 +196,13 @@ export function EditPropertyForm({
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-3.5">
           <Link
             href={`/properties/${prop.id}`}
-            className="inline-flex items-center gap-1.5 text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Discard
           </Link>
           <div className="flex items-center gap-3">
             {saved && (
-              <span className="inline-flex items-center gap-1.5 text-[0.8125rem] font-medium text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted">
                 <Check className="h-3.5 w-3.5" /> Saved
               </span>
             )}

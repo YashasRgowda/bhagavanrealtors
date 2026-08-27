@@ -1,30 +1,85 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { WizardShell } from "@/components/wizard/WizardShell";
+import { ChoiceCard, ChoiceGrid } from "@/components/wizard/ChoiceCard";
 import { DetailsForm } from "@/components/wizard/DetailsForm";
 import { MediaUpload } from "@/components/wizard/MediaUpload";
+import { WaitingBuyers } from "@/components/wizard/WaitingBuyers";
 import { initialWizardState, type WizardState } from "@/components/wizard/types";
 import { TRANSACTION_TYPES, CATEGORIES, PROPERTY_TYPES } from "@/lib/property/enums";
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
-import { isIndianMobile, isIndianPhoneLenient } from "@/lib/format/phone";
+import { ArrowLeft, ArrowRight, Check, AlertTriangle } from "lucide-react";
+import { isIndianPhoneLenient } from "@/lib/format/phone";
+import { DUR, EASE_OUT, useMotionPrefs } from "@/lib/motion";
+
+/**
+ * Panels travel horizontally so "forward" and "back" are unmistakable.
+ * 24px — enough to read as direction, not enough to delay a field becoming
+ * usable. Defined at module scope so the object identity never changes.
+ */
+const PANEL = {
+  enter: (d: number) => ({ opacity: 0, x: d * 24 }),
+  center: { opacity: 1, x: 0, transition: { duration: DUR.slow, ease: EASE_OUT } },
+} as const;
 
 const LABELS = ["Deal", "Type", "Details", "Photos", "Review"];
 const HEADINGS = ["Deal type", "Property type", "Property details", "Photos & video", "All done"];
 const TOTAL = LABELS.length;
 
+const DEAL_BLURB: Record<string, string> = {
+  sale:  "One-time sale of the property",
+  rent:  "Monthly rent + refundable deposit",
+  lease: "Karnataka-style lump-sum lease",
+};
+
 export default function NewPropertyPage() {
   const router = useRouter();
+  const m = useMotionPrefs();
   const [step, setStep] = useState(1);
+  // Which way the next panel should travel in from. Forward = from the right.
+  const [dir, setDir] = useState(1);
   const [state, setState] = useState<WizardState>(initialWizardState);
   const [propertyId, setPropertyId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Fields only turn red once he has asked to be shown what is missing.
+  const [touched, setTouched] = useState(false);
+  const [pendingJump, setPendingJump] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const set = (patch: Partial<WizardState>) => setState(prev => ({ ...prev, ...patch }));
+
+  /**
+   * Move the cursor into the field a summary chip points at.
+   *
+   * Runs from an effect rather than the click handler on purpose: revealing
+   * the inline messages re-renders the form, and focus applied before that
+   * commit gets dropped. An effect fires after the DOM is settled, so the
+   * measurement is right and the focus sticks.
+   *
+   * Also avoids `scrollIntoView` — the step panel carries an animating
+   * `transform`, which that API resolves against and then silently no-ops.
+   */
+  useEffect(() => {
+    if (!pendingJump) return;
+    const el = document.getElementById(pendingJump);
+    setPendingJump(null);
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY - window.innerHeight / 2;
+    // Instant, not smooth: focusing the field cancels an in-flight smooth
+    // scroll, which left the dealer with a focused input he still could not
+    // see. Arriving immediately is also the right call for someone who just
+    // said "show me what's missing".
+    window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+    el.focus({ preventScroll: true });
+  }, [pendingJump]);
+
+  const go = (next: number) => {
+    setDir(next >= step ? 1 : -1);
+    setStep(next);
+  };
 
   const typeChoices = useMemo(() => {
     if (!state.category) return [];
@@ -36,20 +91,39 @@ export default function NewPropertyPage() {
       });
   }, [state.category, state.transaction_type]);
 
-  function validationErrors(): string[] {
+  /**
+   * Identical rules to before — only the shape changed. Each entry now carries
+   * the field it belongs to and the id of its input, so the summary can put the
+   * dealer's cursor straight into the box that needs him rather than leaving
+   * him to hunt down a long form.
+   */
+  type FieldIssue = { field: string; anchor: string; message: string };
+
+  function validationIssues(): FieldIssue[] {
     if (step !== 3) return [];
-    const errs: string[] = [];
-    if (!state.price)                                              errs.push("Price is required");
-    if (!state.area_value)                                         errs.push("Area is required");
-    if (!state.area_unit)                                          errs.push("Area unit is required");
-    if (!state.locality)                                           errs.push("Locality is required");
-    if (!state.contact.owner_phone)                                errs.push("Owner phone is required");
-    else if (!isIndianPhoneLenient(state.contact.owner_phone))     errs.push("Owner phone doesn't look valid");
+    const errs: FieldIssue[] = [];
+    if (!state.price)
+      errs.push({ field: "price", anchor: "f-price", message: "Add the price" });
+    if (!state.area_value)
+      errs.push({ field: "area_value", anchor: "f-area", message: "Add the area" });
+    if (!state.area_unit)
+      errs.push({ field: "area_unit", anchor: "f-area-unit", message: "Pick the area unit" });
+    if (!state.locality)
+      errs.push({ field: "locality", anchor: "f-locality", message: "Add the locality" });
+    if (!state.contact.owner_phone)
+      errs.push({ field: "owner_phone", anchor: "f-owner-phone", message: "Add the owner's phone number" });
+    else if (!isIndianPhoneLenient(state.contact.owner_phone))
+      errs.push({ field: "owner_phone", anchor: "f-owner-phone", message: "That phone number doesn't look right" });
     const needsBhk =
       state.category === "residential" &&
       ["flat", "villa", "builder_floor", "studio", "penthouse"].includes(state.property_type);
-    if (needsBhk && !state.bhk)                                    errs.push("BHK is required");
+    if (needsBhk && !state.bhk)
+      errs.push({ field: "bhk", anchor: "f-bhk", message: "Pick the BHK" });
     return errs;
+  }
+
+  function validationErrors(): string[] {
+    return validationIssues().map(e => e.message);
   }
 
   function canAdvance(): boolean {
@@ -117,7 +191,7 @@ export default function NewPropertyPage() {
       if (!res.ok) throw new Error(await res.text());
       const { id } = await res.json();
       setPropertyId(id);
-      setStep(4);
+      go(4);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -130,167 +204,210 @@ export default function NewPropertyPage() {
     router.refresh();
   }
 
+  const issues = validationIssues();
+  const errs = issues.map(e => e.message);
+  const errorMap = Object.fromEntries(issues.map(e => [e.field, e.message]));
+
+  /**
+   * Scroll the field into view and put the cursor in it.
+   *
+   * Order matters: revealing the inline messages adds a line under several
+   * fields, which pushes the target further down the page. Flip `touched`
+   * first and wait two frames for React to commit and layout to settle, or the
+   * scroll lands where the field *used* to be.
+   */
+  function jumpTo(anchor: string) {
+    setTouched(true);
+    setPendingJump(anchor);
+  }
+
   return (
-    <WizardShell step={step} total={TOTAL} labels={LABELS} heading={HEADINGS[step - 1]}>
-      <Card>
-        <CardContent className="p-5 sm:p-7">
+    <WizardShell
+      step={step}
+      total={TOTAL}
+      labels={LABELS}
+      heading={HEADINGS[step - 1]}
+      actions={
+        <>
+          <Button
+            variant="ghost"
+            onClick={() => go(Math.max(1, step - 1))}
+            disabled={step === 1 || busy}
+          >
+            <ArrowLeft aria-hidden /> Back
+          </Button>
+
+          <div className="ml-auto flex min-w-0">
+            {step < 3 && (
+              <Button size="lg" onClick={() => go(step + 1)} disabled={!canAdvance()}>
+                Continue <ArrowRight aria-hidden />
+              </Button>
+            )}
+            {step === 3 && (
+              <Button size="lg" onClick={createDraft} disabled={!canAdvance() || busy} loading={busy}>
+                {propertyId ? "Update & continue" : "Save & add photos"}
+                <ArrowRight aria-hidden />
+              </Button>
+            )}
+            {step === 4 && (
+              <Button size="lg" onClick={() => go(5)}>
+                Continue <ArrowRight aria-hidden />
+              </Button>
+            )}
+            {step === 5 && (
+              <Button size="lg" onClick={finish}>
+                <Check aria-hidden /> View property
+              </Button>
+            )}
+          </div>
+        </>
+      }
+    >
+      <motion.div
+        key={step}
+        custom={m.animate ? dir : 0}
+        variants={PANEL}
+        initial="enter"
+        animate="center"
+      >
+          {/* ── 1 · Deal type ── */}
           {step === 1 && (
-            <div className="space-y-5">
-              <h2 className="text-[0.9375rem] font-medium text-muted-foreground">
-                Is this property for sale or rent?
-              </h2>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {TRANSACTION_TYPES.map(t => {
-                  const selected = state.transaction_type === t.value;
-                  return (
-                    <button
-                      key={t.value}
-                      onClick={() => set({ transaction_type: t.value })}
-                      className={`rounded-lg border p-4 text-left transition-all duration-200 ${
-                        selected
-                          ? "border-foreground bg-foreground text-background shadow-sm"
-                          : "border-border bg-card hover:border-foreground/35 hover:bg-muted/40"
-                      }`}
-                    >
-                      <div className="font-display text-lg leading-tight">{t.label}</div>
-                      <div className={`mt-1.5 text-xs leading-relaxed ${selected ? "text-background/60" : "text-muted-foreground"}`}>
-                        {t.value === "sale" && "One-time sale of the property"}
-                        {t.value === "rent" && "Monthly rent + refundable deposit"}
-                        {t.value === "lease" && "Karnataka-style lump-sum lease"}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          <section className="flex flex-col gap-4">
+            <h2 className="text-sm text-ink-muted">
+              Is this property for sale or for rent?
+            </h2>
+            <ChoiceGrid columns={3}>
+              {TRANSACTION_TYPES.map(t => (
+                <ChoiceCard
+                  key={t.value}
+                  label={t.label}
+                  description={DEAL_BLURB[t.value]}
+                  selected={state.transaction_type === t.value}
+                  onSelect={() => set({ transaction_type: t.value })}
+                />
+              ))}
+            </ChoiceGrid>
+          </section>
           )}
 
+          {/* ── 2 · Category + type ── */}
           {step === 2 && (
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <h2 className="eyebrow">Category</h2>
-                <div className="grid grid-cols-3 gap-2">
-                  {CATEGORIES.map(c => {
-                    const selected = state.category === c.value;
-                    return (
-                      <button
-                        key={c.value}
-                        onClick={() => set({ category: c.value, property_type: "" })}
-                        className={`rounded-md border px-3 py-3.5 text-sm font-medium transition-all duration-200 ${
-                          selected
-                            ? "border-foreground bg-foreground text-background shadow-sm"
-                            : "border-border bg-card hover:border-foreground/35 hover:bg-muted/40"
-                        }`}
-                      >
-                        {c.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+          <div className="flex flex-col gap-7">
+            <section className="flex flex-col gap-3">
+              <h2 className="text-micro uppercase text-ink-muted">Category</h2>
+              <ChoiceGrid columns={3}>
+                {CATEGORIES.map(c => (
+                  <ChoiceCard
+                    key={c.value}
+                    label={c.label}
+                    selected={state.category === c.value}
+                    onSelect={() => set({ category: c.value, property_type: "" })}
+                  />
+                ))}
+              </ChoiceGrid>
+            </section>
 
-              {state.category && (
-                <div className="space-y-3">
-                  <h2 className="eyebrow">Property type</h2>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {typeChoices.map(t => {
-                      const selected = state.property_type === t.value;
-                      return (
-                        <button
-                          key={t.value}
-                          onClick={() => set({ property_type: t.value })}
-                          className={`rounded-md border px-3 py-3 text-[0.8125rem] leading-snug transition-all duration-200 ${
-                            selected
-                              ? "border-foreground bg-foreground font-medium text-background shadow-sm"
-                              : "border-border bg-card hover:border-foreground/35 hover:bg-muted/40"
-                          }`}
-                        >
-                          {t.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
+            {state.category && (
+              <motion.section
+                initial={m.animate ? { opacity: 0, y: 8 } : { opacity: 0 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: DUR.base, ease: EASE_OUT }}
+                className="flex flex-col gap-3"
+              >
+                <h2 className="text-micro uppercase text-ink-muted">Property type</h2>
+                <ChoiceGrid columns={2}>
+                  {typeChoices.map(t => (
+                    <ChoiceCard
+                      key={t.value}
+                      label={t.label}
+                      selected={state.property_type === t.value}
+                      onSelect={() => set({ property_type: t.value })}
+                    />
+                  ))}
+                </ChoiceGrid>
+              </motion.section>
+            )}
+          </div>
           )}
 
+          {/* ── 3 · Details ── */}
           {step === 3 && (
-            <>
-              <DetailsForm state={state} set={set} propertyId={propertyId} />
-              {(() => {
-                const errs = validationErrors();
-                if (errs.length === 0) return null;
-                return (
-                  <div className="mt-5 rounded-lg border border-[color:var(--danger)]/25 bg-[color:var(--danger)]/5 p-4 text-sm">
-                    <p className="font-medium text-[color:var(--danger)]">Still needed before you can continue</p>
-                    <ul className="mt-2 space-y-1 text-[color:var(--danger)]/85">
-                      {errs.map(e => <li key={e}>· {e}</li>)}
-                    </ul>
-                  </div>
-                );
-              })()}
-            </>
-          )}
-
-          {step === 4 && propertyId && (
-            <div className="space-y-5">
-              <p className="text-[0.9375rem] text-muted-foreground">
-                The first photo becomes the cover. Add as many as you like — you can reorder later.
-              </p>
-              <MediaUpload propertyId={propertyId} />
-            </div>
-          )}
-
-          {step === 5 && (
-            <div className="py-6 text-center">
-              <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-foreground text-background">
-                <Check className="h-6 w-6" strokeWidth={2} />
+          <div className="flex flex-col gap-5">
+            {/* At the top, not the foot. The old summary sat below a very long
+                form, so the only way to discover what was missing was to fill
+                everything and scroll to the end. */}
+            {issues.length > 0 && (
+              <div className="rounded-lg border border-danger/30 bg-danger-subtle p-4">
+                <p className="flex items-center gap-2 text-sm font-medium text-danger-text">
+                  <AlertTriangle className="size-4 shrink-0" aria-hidden />
+                  {issues.length} thing{issues.length === 1 ? "" : "s"} left to fill
+                </p>
+                <ul className="mt-2.5 flex flex-wrap gap-2">
+                  {issues.map(e => (
+                    <li key={e.field + e.message}>
+                      <button
+                        type="button"
+                        onClick={() => jumpTo(e.anchor)}
+                        className="inline-flex min-h-9 items-center rounded-md border border-danger/30 bg-elevated px-3 text-sm font-medium text-danger-text transition-colors pointer-coarse:min-h-11 hover:bg-danger-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      >
+                        {e.message}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <h2 className="mt-6 font-display text-2xl leading-tight">All set</h2>
-              <p className="mx-auto mt-2.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Your property is live in the catalogue and ready to share.
-              </p>
-            </div>
+            )}
+            <DetailsForm
+              state={state}
+              set={set}
+              propertyId={propertyId}
+              errors={touched ? errorMap : undefined}
+            />
+          </div>
+          )}
+
+          {/* ── 4 · Media ── */}
+          {step === 4 && propertyId && (
+          <section className="flex flex-col gap-5">
+            <p className="text-sm text-ink-muted">
+              The first photo becomes the cover. Add as many as you like — you can
+              reorder them later.
+            </p>
+            <MediaUpload propertyId={propertyId} />
+          </section>
+          )}
+
+          {/* ── 5 · Done ── */}
+          {step === 5 && (
+          <section className="text-center">
+            <motion.div
+              initial={m.animate ? { scale: 0.8, opacity: 0 } : { opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 400, damping: 24, mass: 0.7 }}
+              className="mx-auto grid size-14 place-items-center rounded-full bg-accent text-accent-fg"
+            >
+              <Check className="size-6" strokeWidth={2.5} aria-hidden />
+            </motion.div>
+            <h2 className="mt-6 text-h2 text-ink">All set</h2>
+            <p className="mx-auto mt-2.5 max-w-sm text-sm text-ink-muted">
+              Your property is live in the catalogue and ready to share.
+            </p>
+
+            {propertyId && (
+              <WaitingBuyers
+                propertyId={propertyId}
+                title={state.title || "a new property"}
+              />
+            )}
+          </section>
           )}
 
           {err && (
-            <p className="mt-5 rounded-md border border-[color:var(--danger)]/25 bg-[color:var(--danger)]/5 px-3 py-2.5 text-sm text-[color:var(--danger)]">
-              {err}
-            </p>
+          <p className="mt-5 rounded-md border border-danger/30 bg-danger-subtle px-3 py-2.5 text-sm text-danger-text">
+            {err}
+          </p>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Nav */}
-      <div className="mt-5 flex items-center justify-between gap-3">
-        <Button
-          variant="ghost"
-          onClick={() => setStep(s => Math.max(1, s - 1))}
-          disabled={step === 1 || busy}
-        >
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Button>
-
-        {step < 3 && (
-          <Button size="lg" onClick={() => setStep(s => s + 1)} disabled={!canAdvance()}>
-            Continue <ArrowRight className="h-4 w-4" />
-          </Button>
-        )}
-        {step === 3 && (
-          <Button size="lg" onClick={createDraft} disabled={!canAdvance() || busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {propertyId ? "Update & continue" : "Save & add photos"}
-            {!busy && <ArrowRight className="h-4 w-4" />}
-          </Button>
-        )}
-        {step === 4 && (
-          <Button size="lg" onClick={() => setStep(5)}>Continue <ArrowRight className="h-4 w-4" /></Button>
-        )}
-        {step === 5 && (
-          <Button size="lg" onClick={finish}><Check className="h-4 w-4" /> View property</Button>
-        )}
-      </div>
+      </motion.div>
     </WizardShell>
   );
 }

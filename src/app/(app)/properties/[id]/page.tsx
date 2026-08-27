@@ -1,20 +1,24 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusPill } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { STATUS_META, PROPERTY_TYPES } from "@/lib/property/enums";
-import { formatINRShort, formatINR } from "@/lib/format/currency";
-import { formatArea } from "@/lib/format/area";
+import { formatINRShort } from "@/lib/format/currency";
 import { formatPhoneIN } from "@/lib/format/phone";
+import { locationDetail } from "@/lib/property/attributes";
 import { StatusChanger } from "@/components/property/StatusChanger";
 import { PropertyActions } from "@/components/property/PropertyActions";
+import { PropertySpecs } from "@/components/property/PropertySpecs";
+import { PropertyDangerZone } from "@/components/property/PropertyDangerZone";
 import { PropertyGallery } from "@/components/property/PropertyGallery";
 import { TenancyList } from "@/components/property/TenancyList";
 import { DealSummaryCard } from "@/components/deal/DealSummaryCard";
 import { SharesList } from "@/components/share/SharesList";
+import { BuyerMatches } from "@/components/property/BuyerMatches";
 import type { PropertyRow, PropertyMediaRow } from "@/lib/property/types";
 import type { DealRow } from "@/lib/deal/types";
+import type { RequirementRow } from "@/lib/requirement/types";
 import { ArrowLeft, MapPin, Lock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -48,183 +52,150 @@ export default async function PropertyDetailPage({
     .select("id, token, preset, hide_owner, hide_address, view_count, expires_at, revoked_at, created_at")
     .eq("property_id", id)
     .order("created_at", { ascending: false });
+  // Active buyer requirements, matched against this property in the panel below.
+  const { data: reqRows = [] } = await supabase
+    .from("requirements").select("*").eq("status", "active");
+  const requirements = (reqRows ?? []) as RequirementRow[];
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
 
+  // Brand identity for the poster generator — same fields the share page uses.
+  const { data: { user: me } } = await supabase.auth.getUser();
+  const { data: profile } = me
+    ? await supabase.from("profiles").select("brand_name, brand_phone, full_name, phone").eq("id", me.id).maybeSingle()
+    : { data: null };
+  const brandName = profile?.brand_name || profile?.full_name || "Bhagvan Realtors";
+  const brandPhone = profile?.brand_phone || profile?.phone || null;
+
   const meta = STATUS_META[prop.status];
-  const typeLabel = (PROPERTY_TYPES[prop.category] as ReadonlyArray<{ value: string; label: string }>).find(t => t.value === prop.property_type)?.label ?? prop.property_type;
+  const typeLabel = (PROPERTY_TYPES[prop.category] as ReadonlyArray<{ value: string; label: string }>)
+    .find(t => t.value === prop.property_type)?.label ?? prop.property_type;
 
   const gallery = (media ?? []) as PropertyMediaRow[];
-
-  const priceMain = prop.price
-    ? formatINRShort(prop.price)
-    : "On request";
-  const priceSuffix = prop.price && prop.transaction_type === "rent" ? "/mo" : "";
+  const title = prop.title || `${typeLabel} in ${prop.locality || prop.city || ""}`;
+  const where = [prop.locality, prop.city].filter(Boolean).join(", ");
+  const whereDetail = locationDetail(prop.attributes);
 
   return (
-    <div className="space-y-6">
-      {/* ─── Back ─── */}
+    <div className="flex flex-col gap-8">
       <Link
         href="/properties"
-        className="inline-flex items-center gap-1.5 text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex w-fit items-center gap-1.5 rounded-sm text-sm font-medium text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
-        <ArrowLeft className="h-3.5 w-3.5" /> Catalogue
+        <ArrowLeft className="size-4" aria-hidden /> Catalogue
       </Link>
 
-      {/* ─── Gallery ─── */}
-      <PropertyGallery
-        media={gallery}
-        title={prop.title || `${typeLabel} in ${prop.locality || prop.city || ""}`}
-      />
+      <PropertyGallery media={gallery} title={title} />
 
-      {/* ─── Title ─── */}
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={meta.variant}>{meta.label}</Badge>
-          <span className="eyebrow">{typeLabel}</span>
+      {/* ── What it is ── */}
+      <header className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <StatusPill status={prop.status} label={meta.label} size="sm" />
+          <span className="text-micro uppercase text-ink-muted">{typeLabel}</span>
         </div>
-        <h1 className="mt-3 font-display text-[1.875rem] leading-[1.12] sm:text-[2.25rem]">
-          {prop.title || `${typeLabel} in ${prop.locality || prop.city || ""}`}
-        </h1>
-        {(prop.locality || prop.city) && (
-          <p className="mt-2.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-            <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
-            {[prop.locality, prop.city].filter(Boolean).join(", ")}
+        <h1 className="mt-3 text-display text-ink text-balance">{title}</h1>
+        {(where || whereDetail) && (
+          <p className="mt-3 flex items-start gap-1.5 text-sm text-ink-muted">
+            <MapPin className="mt-0.5 size-4 shrink-0" strokeWidth={1.5} aria-hidden />
+            <span>
+              {where}
+              {whereDetail && <span className="text-ink-subtle"> · {whereDetail}</span>}
+            </span>
           </p>
         )}
-      </div>
-
-      <div className="rule-fade" />
+      </header>
 
       {/*
-        Two-column body. The sidebar (price + actions) is rendered FIRST so that
-        on a phone — where this collapses to one column — the dealer sees the
-        price and the primary action immediately under the title, not buried
-        below the specs. `lg:order-*` restores main-left / sidebar-right on desktop.
+        Main column carries everything the dealer reads; the sidebar carries
+        everything he acts on. On a phone `order-last` keeps the private owner
+        block and the status control below the specs and the waiting buyers.
       */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
-        {/* ── Sticky sidebar ── */}
-        <aside className="space-y-4 lg:order-2 lg:sticky lg:top-24">
-          {/* Price + actions */}
-          <Card className="overflow-hidden">
-            <div className="border-b border-border bg-muted/50 px-5 py-5">
-              <p className="eyebrow">
-                {prop.transaction_type === "rent"
-                  ? "Monthly rent"
-                  : prop.transaction_type === "lease"
-                    ? "Lease amount"
-                    : "Asking price"}
-              </p>
-              <p className="tabular mt-2 font-display text-[2.25rem] leading-none">
-                {priceMain}
-                {priceSuffix && (
-                  <span className="ml-1 font-sans text-sm font-medium tracking-normal text-muted-foreground">
-                    {priceSuffix}
-                  </span>
-                )}
-              </p>
-              {prop.price ? (
-                <p className="tabular mt-2 text-xs text-muted-foreground">{formatINR(prop.price)}</p>
-              ) : null}
-              {prop.is_negotiable && prop.transaction_type === "sale" ? (
-                <p className="mt-2 text-xs text-muted-foreground">Negotiable</p>
-              ) : null}
-            </div>
-            <CardContent className="p-5">
-              <PropertyActions
-                prop={prop}
-                media={gallery}
-                hasDeal={Boolean(activeDeal)}
-                shareCount={(shares ?? []).length}
-              />
-            </CardContent>
-          </Card>
+      <div className="grid gap-x-6 gap-y-8 lg:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)] lg:items-start">
+        {/* ── Act ── */}
+        <aside className="flex flex-col gap-4 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24">
+          <PropertyActions
+            prop={prop}
+            media={gallery}
+            brandName={brandName}
+            brandPhone={brandPhone}
+          />
 
-          {/* Status */}
           <StatusChanger propertyId={prop.id} status={prop.status} txn={prop.transaction_type} />
 
-          {/* Owner contact (private) */}
           {contact && (contact.owner_name || contact.owner_phone) && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="eyebrow flex items-center gap-1.5">
-                  <Lock className="h-3 w-3" strokeWidth={2} /> Owner contact
-                </CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  Private — never included in shared listings.
-                </p>
-              </CardHeader>
-              <CardContent className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-1">
-                {contact.owner_name && <Spec label="Name" value={contact.owner_name} />}
-                {contact.owner_phone && <Spec label="Phone" value={formatPhoneIN(contact.owner_phone)} />}
-                {contact.owner_alt_phone && <Spec label="Alt" value={formatPhoneIN(contact.owner_alt_phone)} />}
+            <Card className="p-5">
+              <h2 className="flex items-center gap-1.5 text-micro uppercase text-ink-muted">
+                <Lock className="size-3" strokeWidth={2.5} aria-hidden /> Owner contact
+              </h2>
+              <p className="mt-1.5 text-xs text-ink-subtle">
+                Private — never included in shared listings.
+              </p>
+              <dl className="mt-4 flex flex-col gap-3.5 border-t border-line-subtle pt-4">
+                {contact.owner_name && <Row label="Name" value={contact.owner_name} />}
+                {contact.owner_phone && (
+                  <Row label="Phone" value={formatPhoneIN(contact.owner_phone)} href={`tel:${contact.owner_phone.replace(/\D/g, "")}`} />
+                )}
+                {contact.owner_alt_phone && (
+                  <Row label="Alt phone" value={formatPhoneIN(contact.owner_alt_phone)} href={`tel:${contact.owner_alt_phone.replace(/\D/g, "")}`} />
+                )}
                 {contact.brokerage_expected && (
-                  <Spec label="Brokerage" value={formatINRShort(contact.brokerage_expected)} />
+                  <Row label="Brokerage" value={formatINRShort(contact.brokerage_expected)} />
                 )}
-                {contact.private_notes && (
-                  <div className="col-span-full">
-                    <p className="eyebrow mb-1.5">Private notes</p>
-                    <p className="whitespace-pre-line text-sm leading-relaxed">{contact.private_notes}</p>
-                  </div>
-                )}
-              </CardContent>
+              </dl>
+              {contact.private_notes && (
+                <p className="mt-4 border-t border-line-subtle pt-4 text-sm whitespace-pre-line text-ink-muted">
+                  {contact.private_notes}
+                </p>
+              )}
             </Card>
           )}
         </aside>
 
-        {/* ── Main column ── */}
-        <div className="space-y-5 lg:order-1">
-          {/* Specs */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="eyebrow">Specifications</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
-              <Spec label="Type" value={typeLabel} />
-              <Spec label="Deal" value={prop.transaction_type} />
-              {prop.bhk && <Spec label="Configuration" value={prop.bhk === "1RK" ? "1 RK" : `${prop.bhk} BHK`} />}
-              {prop.area_value && <Spec label="Area" value={formatArea(prop.area_value, prop.area_unit)} />}
-              {prop.deposit && <Spec label="Deposit" value={formatINRShort(prop.deposit)} />}
-              {Object.entries(prop.attributes || {})
-                // Skip internal bookkeeping keys (e.g. _area_auto) and blanks.
-                .filter(([k, v]) => !k.startsWith("_") && v !== null && v !== "" && v !== undefined)
-                .slice(0, 12)
-                .map(([k, v]) => (
-                  <Spec key={k} label={k.replace(/_/g, " ")} value={String(v)} />
-                ))}
-            </CardContent>
-          </Card>
+        {/* ── Read ── */}
+        <div className="flex flex-col gap-8 lg:col-start-1 lg:row-start-1">
+          <PropertySpecs prop={prop} />
 
-          {/* Description */}
           {prop.description && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="eyebrow">Description</CardTitle>
-              </CardHeader>
-              <CardContent className="whitespace-pre-line text-sm leading-relaxed text-foreground/85">
+            <Card className="p-5">
+              <h2 className="text-micro uppercase text-ink-muted">Description</h2>
+              <p className="mt-4 text-sm leading-relaxed whitespace-pre-line text-ink">
                 {prop.description}
-              </CardContent>
+              </p>
             </Card>
           )}
 
-          {/* Active sale deal */}
+          <BuyerMatches prop={prop} requirements={requirements} title={title} />
+
           {activeDeal && <DealSummaryCard deal={activeDeal} propertyId={prop.id} />}
 
-          {/* Tenancy history */}
           {tenancy && tenancy.length > 0 && <TenancyList items={tenancy} />}
 
-          {/* Shared links */}
           {shares && shares.length > 0 && <SharesList shares={shares} appUrl={appUrl} />}
         </div>
       </div>
+
+      <PropertyDangerZone
+        propertyId={prop.id}
+        title={title}
+        mediaCount={gallery.length}
+        hasDeal={Boolean(activeDeal)}
+        shareCount={(shares ?? []).length}
+      />
     </div>
   );
 }
 
-function Spec({ label, value }: { label: string; value: string }) {
+function Row({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
-    <div className="min-w-0">
-      <p className="eyebrow">{label}</p>
-      <p className="mt-1.5 truncate text-sm font-medium capitalize">{value}</p>
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="shrink-0 text-micro uppercase text-ink-muted">{label}</dt>
+      <dd className="min-w-0 truncate text-right text-sm font-medium text-ink">
+        {href ? (
+          <a href={href} className="underline decoration-line-strong underline-offset-4 hover:decoration-ink">
+            {value}
+          </a>
+        ) : value}
+      </dd>
     </div>
   );
 }

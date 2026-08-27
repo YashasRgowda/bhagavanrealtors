@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Trash2, ExternalLink, Eye, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 type ShareRow = {
   id: string;
@@ -20,10 +19,19 @@ type ShareRow = {
   created_at: string;
 };
 
+/**
+ * Links you have sent out.
+ *
+ * The raw URL is no longer printed under every row — a wall of
+ * `localhost:3000/share/8fMq1vs8qwr1i6` is unreadable and unscannable. What
+ * the dealer actually wants is which preset went out, how many people opened
+ * it, and a way to copy or kill it.
+ */
 export function SharesList({ shares, appUrl }: { shares: ShareRow[]; appUrl: string }) {
   const router = useRouter();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   if (shares.length === 0) return null;
 
@@ -34,67 +42,136 @@ export function SharesList({ shares, appUrl }: { shares: ShareRow[]; appUrl: str
   }
 
   async function revoke(id: string) {
-    if (!confirm("Revoke this link? Anyone opening it will see 'link no longer available'.")) return;
     setBusyId(id);
     await fetch(`/api/shares/${id}`, { method: "DELETE" });
     setBusyId(null);
+    setConfirmId(null);
     router.refresh();
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="eyebrow">Shared links ({shares.length})</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-micro uppercase text-ink-muted">Shared links · {shares.length}</h2>
+        <span className="h-px flex-1 bg-line" aria-hidden />
+      </div>
+
+      <ul className="flex flex-col gap-2">
         {shares.map(s => {
           const url = `${appUrl}/share/${s.token}`;
           const expired = s.expires_at ? new Date(s.expires_at) < new Date() : false;
           const revoked = Boolean(s.revoked_at);
           const dead = expired || revoked;
+          const confirming = confirmId === s.id;
+
           return (
-            <div key={s.id} className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={dead ? "muted" : s.preset === "full" ? "warning" : "default"}>
-                    {s.preset ?? "custom"}
-                  </Badge>
-                  {revoked && <Badge variant="danger">Revoked</Badge>}
-                  {expired && !revoked && <Badge variant="danger">Expired</Badge>}
-                  <span className="text-xs text-muted-foreground">
-                    <Eye className="mr-0.5 inline h-3 w-3" /> {s.view_count} view{s.view_count === 1 ? "" : "s"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    · created {safeDate(s.created_at)}
-                    {s.expires_at ? ` · expires ${safeDate(s.expires_at)}` : ""}
-                  </span>
+            <li
+              key={s.id}
+              className={cn(
+                "flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg border border-line bg-elevated p-4 shadow-sm",
+                dead && "opacity-60",
+              )}
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <Badge tone={dead ? "neutral" : s.preset === "full" ? "warning" : "accent"} size="sm">
+                  {s.preset ?? "custom"}
+                </Badge>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink">
+                    {revoked ? "Revoked" : expired ? "Expired"
+                      : `${s.view_count} ${s.view_count === 1 ? "view" : "views"}`}
+                  </p>
+                  <p className="truncate text-xs text-ink-muted">
+                    Sent {safeDate(s.created_at)}
+                    {s.expires_at && !revoked ? ` · expires ${safeDate(s.expires_at)}` : ""}
+                  </p>
                 </div>
-                <div className="flex items-center gap-1">
+                {!dead && s.view_count > 0 && (
+                  <Eye className="size-4 shrink-0 text-ink-subtle" aria-hidden />
+                )}
+              </div>
+
+              {confirming ? (
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-sm text-ink-muted">Kill this link?</span>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmId(null)}
+                    className="h-10 rounded-md border border-line px-3 text-sm font-medium text-ink transition-colors hover:bg-subtle"
+                  >
+                    Keep
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => revoke(s.id)}
+                    disabled={busyId === s.id}
+                    className="inline-flex h-10 items-center gap-1.5 rounded-md bg-danger px-3 text-sm font-medium text-on-solid transition-[filter] hover:brightness-110 disabled:opacity-60"
+                  >
+                    {busyId === s.id && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                    Revoke
+                  </button>
+                </div>
+              ) : (
+                <div className="flex shrink-0 items-center gap-1.5">
                   {!dead && (
                     <>
-                      <Button size="sm" variant="ghost" onClick={() => copy(url, s.id)}>
-                        {copiedId === s.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      </Button>
-                      <a href={url} target="_blank" rel="noreferrer">
-                        <Button size="sm" variant="ghost"><ExternalLink className="h-3.5 w-3.5" /></Button>
+                      <IconBtn
+                        onClick={() => copy(url, s.id)}
+                        label={copiedId === s.id ? "Copied" : "Copy link"}
+                      >
+                        {copiedId === s.id
+                          ? <Check className="size-4 text-accent-text" aria-hidden />
+                          : <Copy className="size-4" aria-hidden />}
+                      </IconBtn>
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="Preview as buyer"
+                        className="grid size-10 place-items-center rounded-md border border-line bg-elevated text-ink transition-colors duration-160 pointer-coarse:size-11 hover:border-line-strong hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      >
+                        <ExternalLink className="size-4" aria-hidden />
                       </a>
                     </>
                   )}
                   {!revoked && (
-                    <Button size="sm" variant="ghost" onClick={() => revoke(s.id)} disabled={busyId === s.id}>
-                      {busyId === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 text-[color:var(--danger)]" />}
-                    </Button>
+                    <IconBtn onClick={() => setConfirmId(s.id)} label="Revoke link" danger>
+                      <Trash2 className="size-4" aria-hidden />
+                    </IconBtn>
                   )}
                 </div>
-              </div>
-              {!dead && (
-                <p className="mt-1 truncate text-xs text-muted-foreground font-mono">{url}</p>
               )}
-            </div>
+            </li>
           );
         })}
-      </CardContent>
-    </Card>
+      </ul>
+    </section>
+  );
+}
+
+function IconBtn({
+  onClick, label, danger, children,
+}: {
+  onClick: () => void;
+  label: string;
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "grid size-10 place-items-center rounded-md border border-line bg-elevated transition-colors duration-160",
+        "pointer-coarse:size-11 hover:border-line-strong hover:bg-subtle",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        danger ? "text-danger-text" : "text-ink",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

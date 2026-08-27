@@ -128,8 +128,8 @@ export function GpsCapture({
     <div className="rounded-lg border border-border bg-muted/40 p-3.5 text-sm">
       {/* Row 1: capture button + coords + actions */}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant={hasCoords ? "outline" : "default"} size="sm" onClick={capture} disabled={busy}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+        <Button type="button" variant={hasCoords ? "outline" : "primary"} onClick={capture} disabled={busy} loading={busy}>
+          <MapPin className="size-4" aria-hidden />
           {hasCoords ? "Re-capture" : "Capture current location"}
         </Button>
         {hasCoords && (
@@ -144,8 +144,8 @@ export function GpsCapture({
               Google Maps <ExternalLink className="h-3 w-3" />
             </a>
             <button type="button" onClick={clearCoords}
-                    className="ml-auto text-xs text-muted-foreground hover:text-[color:var(--danger)]">
-              <X className="inline h-3.5 w-3.5" /> clear
+                    className="ml-auto inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-ink-muted transition-colors hover:text-danger-text">
+              <X className="size-3.5" aria-hidden /> clear
             </button>
           </>
         )}
@@ -174,14 +174,14 @@ export function GpsCapture({
               if (text) setTimeout(() => applyPastedCoords(text), 0);
             }}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyPastedCoords(); } }}
-            className="h-8 flex-1 font-mono text-xs"
+            className="flex-1 font-mono text-xs"
             disabled={busy}
           />
           <button type="button"
                   onClick={() => setShowHelp(v => !v)}
-                  className="text-xs text-muted-foreground hover:text-foreground"
+                  className="grid size-11 shrink-0 place-items-center rounded-md text-ink-muted transition-colors hover:bg-inset hover:text-ink"
                   aria-label="How to get coordinates from Google Maps">
-            <HelpCircle className="h-4 w-4" />
+            <HelpCircle className="size-4" aria-hidden />
           </button>
         </div>
       )}

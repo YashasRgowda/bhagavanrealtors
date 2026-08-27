@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { PropertyCard } from "@/components/property/PropertyCard";
+import { CatalogueGrid } from "@/components/property/CatalogueGrid";
+import { CatalogueCount } from "@/components/property/CatalogueCount";
 import { CatalogueFilters } from "@/components/property/CatalogueFilters";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { LIVE_STATUSES } from "@/lib/property/enums";
-import { Plus, SearchX } from "lucide-react";
+import { Plus, SearchX, AlertTriangle, Building2 } from "lucide-react";
 import type { PropertyRow, PropertyMediaRow } from "@/lib/property/types";
 
 export const dynamic = "force-dynamic";
@@ -47,83 +48,84 @@ export default async function CataloguePage({
         .order("sort_order", { ascending: true })
     : { data: [] as PropertyMediaRow[] };
 
-  const coverByProp = new Map<string, PropertyMediaRow>();
+  const coverByProp: Record<string, PropertyMediaRow> = {};
   for (const m of (media ?? []) as PropertyMediaRow[]) {
-    if (!coverByProp.has(m.property_id) || m.is_cover) coverByProp.set(m.property_id, m);
+    if (!coverByProp[m.property_id] || m.is_cover) coverByProp[m.property_id] = m;
   }
 
   const isFiltered = Boolean(q || txn || cat || locality);
 
   return (
-    <div className="space-y-7">
-      <PageHeader
-        eyebrow="Catalogue"
-        title="Live properties"
-        description={
-          list.length
-            ? `${list.length} ${list.length === 1 ? "property" : "properties"} currently on the market.`
-            : "Nothing live yet — add your first property to start the catalogue."
-        }
-        action={
-          <Link href="/properties/new">
-            <Button size="lg">
-              <Plus className="h-4 w-4" /> Add property
-            </Button>
-          </Link>
-        }
-      />
+    <div className="flex flex-col gap-8 md:gap-10">
+      {/* ── Header ── */}
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-micro uppercase text-ink-muted">Catalogue</p>
+          <h1 className="mt-3 text-h1 text-ink">Live properties</h1>
+          <p className="mt-2 max-w-xl text-sm text-ink-muted">
+            {list.length > 0 ? (
+              <>
+                <CatalogueCount value={list.length} singular="property" plural="properties" />
+                {isFiltered ? " match your filters." : " currently on the market."}
+              </>
+            ) : (
+              "Nothing live yet — add your first property to start the catalogue."
+            )}
+          </p>
+        </div>
 
+        {/* On a phone the thumb-zone route to the same place is the bottom
+            nav's Add tab, so this stays from sm up. */}
+        <Link href="/properties/new" className="hidden shrink-0 sm:block">
+          <Button size="lg">
+            <Plus aria-hidden /> Add property
+          </Button>
+        </Link>
+      </header>
+
+      {/* ── Controls ── */}
       <CatalogueFilters />
 
-      {error && (
-        <p className="rounded-md border border-[color:var(--danger)]/25 bg-[color:var(--danger)]/5 px-3 py-2.5 text-sm text-[color:var(--danger)]">
-          Couldn&apos;t load properties: {error.message}
-        </p>
-      )}
-
-      {list.length === 0 ? (
-        isFiltered ? <NoMatches /> : <EmptyState />
+      {/* ── Results ── */}
+      {error ? (
+        <EmptyState
+          tone="error"
+          icon={<AlertTriangle className="size-6" strokeWidth={1.75} aria-hidden />}
+          title="Couldn't load your properties"
+          description={error.message}
+          action={
+            <Link href="/properties">
+              <Button variant="outline" size="lg">Try again</Button>
+            </Link>
+          }
+        />
+      ) : list.length === 0 ? (
+        isFiltered ? (
+          <EmptyState
+            icon={<SearchX className="size-6" strokeWidth={1.75} aria-hidden />}
+            title="No properties match those filters"
+            description="Try widening the search, or clear the filters to see everything that's live."
+            action={
+              <Link href="/properties">
+                <Button variant="outline" size="lg">Clear filters</Button>
+              </Link>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={<Building2 className="size-6" strokeWidth={1.75} aria-hidden />}
+            title="Your catalogue is empty"
+            description="Add your first property and it stays with you forever — live, negotiating, or closed. Nothing is ever deleted."
+            action={
+              <Link href="/properties/new">
+                <Button size="lg"><Plus aria-hidden /> Add your first property</Button>
+              </Link>
+            }
+          />
+        )
       ) : (
-        <div className="grid grid-cols-2 gap-3.5 md:grid-cols-3 md:gap-5 xl:grid-cols-4">
-          {list.map(p => (
-            <PropertyCard key={p.id} p={p} cover={coverByProp.get(p.id) ?? null} />
-          ))}
-        </div>
+        <CatalogueGrid items={list} covers={coverByProp} />
       )}
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="rounded-2xl border border-dashed border-border-strong bg-card px-6 py-16 text-center">
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-foreground text-background">
-        <Plus className="h-6 w-6" strokeWidth={1.75} />
-      </div>
-      <h2 className="mt-6 font-display text-2xl leading-tight">Your catalogue is empty</h2>
-      <p className="mx-auto mt-2.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-        Add your first property and it stays with you forever — live, negotiating,
-        or closed. Nothing is ever deleted.
-      </p>
-      <Link href="/properties/new" className="mt-7 inline-block">
-        <Button size="lg">
-          <Plus className="h-4 w-4" /> Add your first property
-        </Button>
-      </Link>
-    </div>
-  );
-}
-
-function NoMatches() {
-  return (
-    <div className="rounded-2xl border border-dashed border-border-strong bg-card px-6 py-14 text-center">
-      <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-muted text-muted-foreground">
-        <SearchX className="h-5 w-5" strokeWidth={1.75} />
-      </div>
-      <p className="mt-5 font-display text-xl">No properties match those filters</p>
-      <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
-        Try widening the search, or clear the filters above.
-      </p>
     </div>
   );
 }
