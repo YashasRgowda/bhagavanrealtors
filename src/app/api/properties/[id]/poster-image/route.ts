@@ -27,12 +27,16 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Without an explicit `m`, fall back to the cover photo as before. With one,
+  // serve whatever that media row is — the poster studio also pulls a frame out
+  // of a video, and that needs the bytes to come from our own origin so the
+  // canvas stays exportable.
   let query = supabase
     .from("property_media")
     .select("url, type, is_cover, sort_order")
-    .eq("property_id", id)
-    .eq("type", "image");
+    .eq("property_id", id);
   if (mediaId) query = query.eq("id", mediaId);
+  else query = query.eq("type", "image");
 
   const { data: rows } = await query.order("is_cover", { ascending: false })
     .order("sort_order", { ascending: true })
@@ -48,6 +52,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   return new NextResponse(upstream.body, {
     headers: {
       "content-type": upstream.headers.get("content-type") ?? "image/webp",
+      // Range support lets a <video> seek to the frame we want.
+      "accept-ranges": upstream.headers.get("accept-ranges") ?? "none",
       // Private: the URL is behind auth, so never let a shared cache hold it.
       "cache-control": "private, max-age=300",
     },

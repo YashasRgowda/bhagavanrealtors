@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Loader2, Copy, Check, ExternalLink, Share2, Eye, EyeOff, ShieldOff, Play, MessageCircle } from "lucide-react";
 import { Modal, ModalStep } from "@/components/ui/modal";
 import { SHARE_PRESETS, FIELD_LABELS, type ShareFields, type SharePresetKey } from "@/lib/share/presets";
+import { buildShareUrl, useShareOrigin } from "@/lib/share/url";
 import type { PropertyMediaRow } from "@/lib/property/types";
 
 type Preset = SharePresetKey | "custom";
@@ -36,6 +37,9 @@ export function ShareComposer({
   const [err, setErr] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // The API also returns a `url`, but it is built from NEXT_PUBLIC_APP_URL.
+  // Rebuild from the token against the real origin instead.
+  const origin = useShareOrigin("");
 
   const applyPreset = (key: Preset) => {
     setPreset(key);
@@ -85,8 +89,8 @@ export function ShareComposer({
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to create link");
-      const { url } = await res.json() as { url: string };
-      setShareUrl(url);
+      const { token } = await res.json() as { token: string };
+      setShareUrl(buildShareUrl(origin || window.location.origin, token));
       router.refresh();
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : String(e));

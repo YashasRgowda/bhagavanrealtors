@@ -124,6 +124,7 @@ export function PropertyActions({
       {showPoster && (
         <PosterStudio
           prop={prop}
+          media={media}
           brandName={brandName || "Bhagvan Realtors"}
           brandPhone={brandPhone}
           onClose={() => setShowPoster(false)}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Trash2, ExternalLink, Eye, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { buildShareUrl, useShareOrigin } from "@/lib/share/url";
 import { cn } from "@/lib/utils";
 
 type ShareRow = {
@@ -32,6 +33,8 @@ export function SharesList({ shares, appUrl }: { shares: ShareRow[]; appUrl: str
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  // Built from the live origin, not from NEXT_PUBLIC_APP_URL — see url.ts.
+  const origin = useShareOrigin(appUrl);
 
   if (shares.length === 0) return null;
 
@@ -58,7 +61,7 @@ export function SharesList({ shares, appUrl }: { shares: ShareRow[]; appUrl: str
 
       <ul className="flex flex-col gap-2">
         {shares.map(s => {
-          const url = `${appUrl}/share/${s.token}`;
+          const url = buildShareUrl(origin, s.token);
           const expired = s.expires_at ? new Date(s.expires_at) < new Date() : false;
           const revoked = Boolean(s.revoked_at);
           const dead = expired || revoked;

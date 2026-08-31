@@ -49,7 +49,7 @@ export function Modal({
   description?: React.ReactNode;
   icon?: React.ReactNode;
   footer?: React.ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   children: React.ReactNode;
   labelledBy?: string;
   role?: "dialog" | "alertdialog";
@@ -68,7 +68,7 @@ export function Modal({
     };
   }, [onClose]);
 
-  const width = { sm: "max-w-md", md: "max-w-lg", lg: "max-w-3xl" }[size];
+  const width = { sm: "max-w-md", md: "max-w-lg", lg: "max-w-3xl", xl: "max-w-6xl" }[size];
 
   return (
     <Portal>
