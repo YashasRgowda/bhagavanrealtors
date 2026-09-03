@@ -63,13 +63,22 @@ export function noir(a: TemplateArgs): TemplateReport {
   const footTop = fmt.contentBottom - footH;
 
   /* ── The photograph takes everything between them ── */
+  const bleed = fmt.photoBleed;
+  const top = headBottom + GAP.typeToPhoto;
   const box = {
-    x, y: headBottom + GAP.typeToPhoto,
-    w, h: footTop - GAP.photoToSpecs - (headBottom + GAP.typeToPhoto),
+    x: bleed ? 0 : x,
+    y: top,
+    w: bleed ? fmt.w : w,
+    h: footTop - GAP.photoToSpecs - top,
   };
+  const radius = bleed ? 0 : RADIUS.photo;
   const photo = a.photos[0] ?? null;
-  if (photo) drawPhoto(ctx, photo, box, { radius: RADIUS.photo, focal: a.focal, edge: theme.photoEdge });
-  else drawPhotoFallback(ctx, box, accent, RADIUS.photo);
+  if (photo) {
+    drawPhoto(ctx, photo, box,
+      { radius, focal: a.focal, edge: bleed ? undefined : theme.photoEdge });
+  } else {
+    drawPhotoFallback(ctx, box, accent, radius);
+  }
 
   const after = drawStack(foot, x, footTop);
   const ruleY = after + GAP.brandToRule;

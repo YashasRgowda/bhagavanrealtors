@@ -13,7 +13,7 @@
 
 import {
   CHIP_FILL, CREDIT_DOT, CREDIT_MIN_SIZE, HAIRLINE_W, ON_ACCENT, PRICE_MIN_SIZE,
-  RADIUS, RULE, SPACE, TYPE,
+  RADIUS, RULE, SPACE, TYPE, type Format,
 } from "../tokens";
 import {
   drawText, fillRoundRect, fitSize, hairline, lineHeight, measureText,
@@ -325,3 +325,30 @@ export function drawStack(rows: Row[], x: number, y: number): number {
   });
   return cy;
 }
+
+/* ─────────────────────────── the photo block ─────────────────────────── */
+
+/**
+ * Where the photograph goes, given the format and where it should end.
+ *
+ * On a Post it sits inside the margin with a radius, like a plate on a card.
+ * On a Status it runs to the edge: a 9:16 frame is tall enough that an inset
+ * photo throws away the full width and the entire top band, and the platform's
+ * profile row is far better spent covering a corner of a photograph than
+ * covering paper.
+ */
+export function heroPhotoBox(fmt: Format, bottom: number) {
+  return fmt.photoBleed
+    ? { x: 0, y: 0, w: fmt.w, h: bottom }
+    : { x: fmt.margin, y: fmt.margin, w: fmt.w - fmt.margin * 2, h: bottom - fmt.margin };
+}
+
+/** Radius and inner hairline only make sense on a photo with a card behind it. */
+export const heroPhotoStyle = (fmt: Format, edge: string) =>
+  fmt.photoBleed ? { radius: 0 } : { radius: RADIUS.photo, edge };
+
+/** The chip always aligns to the type column, whether the photo bleeds or not. */
+export const chipOrigin = (fmt: Format, box: { x: number; y: number }) => ({
+  x: Math.max(box.x + SPACE.x5, fmt.margin),
+  y: Math.max(box.y + SPACE.x5, fmt.contentTop),
+});

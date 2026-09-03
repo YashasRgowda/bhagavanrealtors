@@ -12,12 +12,13 @@
  * asked to fill a gap it did not create.
  */
 
-import { HAIRLINE_W, RADIUS, SPACE } from "../tokens";
+import { HAIRLINE_W, SPACE } from "../tokens";
 import { hairline } from "../text";
 import { drawPhoto, drawPhotoFallback } from "../photo";
 import {
-  accentRule, brandLockup, chip, credit, drawStack, headline, price, specStrip,
-  stackHeight, type PartCtx, type Row, type Surface,
+  accentRule, brandLockup, chip, chipOrigin, credit, drawStack, headline,
+  heroPhotoBox, heroPhotoStyle, price, specStrip, stackHeight,
+  type PartCtx, type Row, type Surface,
 } from "./parts";
 import type { TemplateArgs, TemplateReport } from "./types";
 
@@ -57,26 +58,23 @@ export function editorial(a: TemplateArgs): TemplateReport {
     stackHeight(rows) + GAP.brandToRule + HAIRLINE_W + GAP.ruleToCredit + creditUnit.h;
 
   /* ── The photo takes what is left, inside the format's allowed band ── */
-  const photoTop = fmt.margin;
   const wanted = fmt.contentBottom - infoH - GAP.photoToRule;
   const photoBottom = Math.max(
     fmt.photoBand[0] * fmt.h,
     Math.min(fmt.photoBand[1] * fmt.h, wanted),
   );
-  const box = { x, y: photoTop, w, h: photoBottom - photoTop };
+  const box = heroPhotoBox(fmt, photoBottom);
 
   const photo = a.photos[0] ?? null;
-  if (photo) {
-    drawPhoto(ctx, photo, box, { radius: RADIUS.photo, focal: a.focal, edge: theme.photoEdge });
-  } else {
-    drawPhotoFallback(ctx, box, accent, RADIUS.photo);
-  }
+  const style = heroPhotoStyle(fmt, theme.photoEdge);
+  if (photo) drawPhoto(ctx, photo, box, { ...style, focal: a.focal });
+  else drawPhotoFallback(ctx, box, accent, style.radius);
 
   /* Chip sits on the photo: it is the one element that must survive the squint
      test, and colour-on-photograph is where it does that. On Status it is
      pushed clear of the profile band. */
-  const c = chip(p);
-  c.draw(box.x + SPACE.x5, Math.max(box.y + SPACE.x5, fmt.contentTop));
+  const origin = chipOrigin(fmt, box);
+  chip(p).draw(origin.x, origin.y);
 
   /* ── The card ── */
   const afterStack = drawStack(rows, x, photoBottom + GAP.photoToRule);

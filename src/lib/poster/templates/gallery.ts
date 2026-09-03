@@ -15,7 +15,7 @@ import { HAIRLINE_W, RADIUS, SPACE } from "../tokens";
 import { hairline } from "../text";
 import { drawPhoto, drawPhotoFallback } from "../photo";
 import {
-  accentRule, brandLockup, chip, credit, drawStack, headline, price,
+  accentRule, brandLockup, chip, chipOrigin, credit, drawStack, headline, price,
   stackHeight, type PartCtx, type Row, type Surface,
 } from "./parts";
 import type { TemplateArgs, TemplateReport } from "./types";
@@ -57,30 +57,39 @@ export function gallery(a: TemplateArgs): TemplateReport {
     fmt.photoBand[0] * fmt.h,
     Math.min(fmt.photoBand[1] * fmt.h, fmt.contentBottom - infoH - GAP.photoToRule),
   );
-  const stackH = stackBottom - fmt.margin;
+  /* Bleeding takes the grid to the canvas edge on Status: the same three
+     photographs, roughly a third more of them visible. */
+  const bleed = fmt.photoBleed;
+  const gx = bleed ? 0 : x;
+  const gw = bleed ? fmt.w : w;
+  const gy = bleed ? 0 : fmt.margin;
+  const radius = bleed ? 0 : RADIUS.photo;
+  const stackH = stackBottom - gy;
 
   const photos = a.photos.slice(0, 3);
   const thumbs = photos.slice(1);
   const thumbH = thumbs.length ? Math.round(stackH * THUMB_SHARE) : 0;
   const heroH = stackH - (thumbs.length ? thumbH + GUTTER : 0);
-  const heroBox = { x, y: fmt.margin, w, h: heroH };
+  const heroBox = { x: gx, y: gy, w: gw, h: heroH };
 
   if (photos[0]) {
-    drawPhoto(ctx, photos[0], heroBox, { radius: RADIUS.photo, focal: a.focal, edge: theme.photoEdge });
+    drawPhoto(ctx, photos[0], heroBox,
+      { radius, focal: a.focal, edge: bleed ? undefined : theme.photoEdge });
   } else {
-    drawPhotoFallback(ctx, heroBox, accent, RADIUS.photo);
+    drawPhotoFallback(ctx, heroBox, accent, radius);
   }
 
   if (thumbs.length) {
     const cols = thumbs.length;
-    const tw = (w - GUTTER * (cols - 1)) / cols;
+    const tw = (gw - GUTTER * (cols - 1)) / cols;
     thumbs.forEach((img, i) => {
-      const box = { x: x + i * (tw + GUTTER), y: fmt.margin + heroH + GUTTER, w: tw, h: thumbH };
-      drawPhoto(ctx, img, box, { radius: RADIUS.photo, edge: theme.photoEdge });
+      const box = { x: gx + i * (tw + GUTTER), y: gy + heroH + GUTTER, w: tw, h: thumbH };
+      drawPhoto(ctx, img, box, { radius, edge: bleed ? undefined : theme.photoEdge });
     });
   }
 
-  chip(p).draw(heroBox.x + SPACE.x5, Math.max(heroBox.y + SPACE.x5, fmt.contentTop));
+  const origin = chipOrigin(fmt, heroBox);
+  chip(p).draw(origin.x, origin.y);
 
   const after = drawStack(rows, x, stackBottom + GAP.photoToRule);
   const ruleY = after + GAP.brandToRule;

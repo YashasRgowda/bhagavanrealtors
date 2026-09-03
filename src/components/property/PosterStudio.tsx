@@ -7,7 +7,6 @@ import {
   Check, Download, ImageOff, Play, Share2, Sun, Moon, Crosshair,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatPhoneIN } from "@/lib/format/phone";
 import { buildPosterContent } from "@/lib/poster/content";
 import { resolvePosterFonts, type PosterFonts } from "@/lib/poster/fonts";
 import { CENTER, type Focal } from "@/lib/poster/photo";
@@ -91,7 +90,7 @@ function grabVideoFrame(src: string): Promise<HTMLImageElement | null> {
 
 function PosterCanvas({
   template, format, theme, content, fonts, photos, focal, accent,
-  displayWidth, pixelRatio = 1, className, canvasRef,
+  displayWidth, maxHeight, pixelRatio = 1, className, canvasRef,
 }: {
   template: PosterTemplateKey;
   format: FormatKey;
@@ -102,13 +101,14 @@ function PosterCanvas({
   focal: Focal;
   accent: string;
   displayWidth: number;
+  /** CSS length. Set on the main preview so a short window shrinks it. */
+  maxHeight?: string;
   pixelRatio?: number;
   className?: string;
   canvasRef?: React.RefObject<HTMLCanvasElement | null>;
 }) {
   const localRef = useRef<HTMLCanvasElement>(null);
   const ref = canvasRef ?? localRef;
-  const { w, h } = FORMATS[format];
 
   useEffect(() => {
     if (!ref.current || !fonts) return;
@@ -121,7 +121,11 @@ function PosterCanvas({
     <canvas
       ref={ref}
       className={className}
-      style={{ width: displayWidth, height: (displayWidth * h) / w, display: "block" }}
+      style={{
+        width: "auto", height: "auto",
+        maxWidth: displayWidth, maxHeight,
+        display: "block",
+      }}
     />
   );
 }
@@ -154,20 +158,20 @@ export function PosterStudio({
 
   const stageRef = useRef<HTMLDivElement>(null);
   const dragFrame = useRef<number | null>(null);
-  const displayProbe = useRef<HTMLSpanElement>(null);
-  const sansProbe = useRef<HTMLSpanElement>(null);
 
   const meta = templateMeta(template);
   const theme = resolveTheme(template, wantedTheme);
   const selected = media.find(m => m.id === selectedId) ?? null;
 
-  /* ── Fonts: loaded and verified before anything is drawn ── */
+  /* ── Fonts: loaded and verified before anything is drawn ──
+     `fontAttempt` exists so a failure is never permanent: the footer offers a
+     retry, and bumping it re-runs resolution. */
+  const [fontAttempt, setFontAttempt] = useState(0);
   useEffect(() => {
     let alive = true;
-    resolvePosterFonts(displayProbe.current, sansProbe.current)
-      .then(f => { if (alive) setFonts(f); });
+    resolvePosterFonts().then(f => { if (alive) setFonts(f); });
     return () => { alive = false; };
-  }, []);
+  }, [fontAttempt]);
 
   /* ── Accent, remembered per device ── */
   const changeAccent = (v: string) => {
@@ -219,10 +223,8 @@ export function PosterStudio({
   const focal = focalFor.id === selectedId ? focalFor.focal : CENTER;
 
   const content = useMemo(
-    () => buildPosterContent(prop, {
-      name: brandName,
-      phone: brandPhone ? formatPhoneIN(brandPhone) : null,
-    }),
+    // The raw number: buildPosterContent owns how a phone is written.
+    () => buildPosterContent(prop, { name: brandName, phone: brandPhone }),
     [prop, brandName, brandPhone],
   );
 
@@ -341,8 +343,15 @@ export function PosterStudio({
                 <Check className="size-3.5" aria-hidden /> {done}
               </span>
             ) : fonts && !fonts.ready ? (
-              <span className="font-medium text-danger-text">
-                Brand fonts haven&apos;t loaded — saving now would give you the wrong typeface.
+              <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 font-medium text-danger-text">
+                Brand fonts haven&apos;t loaded — saving now would give the wrong typeface.
+                <button
+                  type="button"
+                  onClick={() => setFontAttempt(n => n + 1)}
+                  className="rounded-sm underline decoration-danger/40 underline-offset-4 hover:decoration-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  Try again
+                </button>
               </span>
             ) : (
               `${FORMATS[format].w * 2} × ${FORMATS[format].h * 2} px · PNG · 2×`
@@ -359,10 +368,6 @@ export function PosterStudio({
         </div>
       }
     >
-      {/* Font probes — never shown, only measured. */}
-      <span ref={displayProbe} className="font-poster absolute -z-10 opacity-0" aria-hidden>.</span>
-      <span ref={sansProbe} className="font-sans absolute -z-10 opacity-0" aria-hidden>.</span>
-
       <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* ── Preview ── */}
         <div className="flex flex-col items-center gap-3">
@@ -400,6 +405,7 @@ export function PosterStudio({
                 focal={focal}
                 accent={accent}
                 displayWidth={previewWidth}
+                maxHeight="min(58dvh, 620px)"
                 className="rounded-lg"
               />
               {/* Skeleton, never a blank flash or a jump. */}

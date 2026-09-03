@@ -48,6 +48,18 @@ export type Format = {
    * the photo takes what is left, clamped to this range.
    */
   photoBand: [min: number, max: number];
+  /**
+   * Whether photography runs to the canvas edge instead of sitting inside the
+   * margin.
+   *
+   * True on Status, and it is the answer to the dead space a 9:16 frame
+   * otherwise leaves: the safe zones exist to keep TEXT out from under the
+   * platform's own chrome, not to keep the poster empty. An inset photo in a
+   * 1080×1920 frame wastes the full width and the whole top band; a bleeding
+   * one uses both, and WhatsApp's profile row sits harmlessly over photography
+   * rather than over the price.
+   */
+  photoBleed: boolean;
 };
 
 /**
@@ -66,14 +78,23 @@ export const FORMATS: Record<FormatKey, Format> = {
     contentBottom: 1350 - 72,    // 1278
     criticalBottom: 1350 - 120,  // 1230
     photoBand: [0.44, 0.62],
+    photoBleed: false,
   },
   status: {
     key: "status", label: "Status", ratio: "9:16", w: 1080, h: 1920,
     margin: 80,
     contentTop: 300,             // clears the 269px profile band with slack
-    contentBottom: 1640,         // clears the 269px reply bar with slack
-    criticalBottom: 1640,
-    photoBand: [0.40, 0.60],
+    /**
+     * The reply affordance measures ~11% of the frame in practice; 1700 leaves
+     * 220px (11.5%) under the last line, which still clears it and returns
+     * 60px that was previously blank card.
+     */
+    contentBottom: 1700,
+    criticalBottom: 1700,
+    /* Taller ceiling: with the info block bottom-anchored, this is what lets
+       the photograph claim the space instead of leaving it empty. */
+    photoBand: [0.46, 0.70],
+    photoBleed: true,
   },
 };
 
