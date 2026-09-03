@@ -90,7 +90,7 @@ function grabVideoFrame(src: string): Promise<HTMLImageElement | null> {
 
 function PosterCanvas({
   template, format, theme, content, fonts, photos, focal, accent,
-  displayWidth, maxHeight, pixelRatio = 1, className, canvasRef,
+  displayWidth, pixelRatio = 1, className, canvasRef,
 }: {
   template: PosterTemplateKey;
   format: FormatKey;
@@ -101,8 +101,6 @@ function PosterCanvas({
   focal: Focal;
   accent: string;
   displayWidth: number;
-  /** CSS length. Set on the main preview so a short window shrinks it. */
-  maxHeight?: string;
   pixelRatio?: number;
   className?: string;
   canvasRef?: React.RefObject<HTMLCanvasElement | null>;
@@ -123,7 +121,9 @@ function PosterCanvas({
       className={className}
       style={{
         width: "auto", height: "auto",
-        maxWidth: displayWidth, maxHeight,
+        // `100%` is what makes this responsive: on a phone the column is
+        // narrower than displayWidth, and a bare px value cannot shrink to it.
+        maxWidth: `min(${displayWidth}px, 100%)`,
         display: "block",
       }}
     />
@@ -357,7 +357,7 @@ export function PosterStudio({
               `${FORMATS[format].w * 2} × ${FORMATS[format].h * 2} px · PNG · 2×`
             )}
           </p>
-          <div className="flex gap-2.5 sm:ml-auto">
+          <div className="flex gap-2.5 sm:ml-auto [&>button]:flex-1 sm:[&>button]:flex-none">
             <Button variant="outline" size="lg" onClick={download} disabled={!canExport || busy !== null} loading={busy === "download"}>
               <Download aria-hidden /> Download
             </Button>
@@ -372,7 +372,7 @@ export function PosterStudio({
         {/* ── Preview ── */}
         <div className="flex flex-col items-center gap-3">
           <div
-            className="relative flex w-full items-center justify-center rounded-lg border border-line bg-subtle p-6"
+            className="relative flex w-full items-center justify-center rounded-lg border border-line bg-subtle p-4 sm:p-6"
             style={{
               backgroundImage:
                 "radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--fg) 6%, transparent) 1px, transparent 0)",
@@ -405,8 +405,7 @@ export function PosterStudio({
                 focal={focal}
                 accent={accent}
                 displayWidth={previewWidth}
-                maxHeight="min(58dvh, 620px)"
-                className="rounded-lg"
+                className="rounded-lg max-h-[min(46dvh,620px)] sm:max-h-[min(58dvh,620px)]"
               />
               {/* Skeleton, never a blank flash or a jump. */}
               {rendering && (
@@ -569,7 +568,7 @@ export function PosterStudio({
                   <span className="text-xs text-ink-subtle">Frame taken from the video</span>
                 )}
               </div>
-              <ul className="grid grid-cols-5 gap-2">
+              <ul className="grid grid-cols-4 gap-2 xs:grid-cols-5">
                 {media.map(m => {
                   const active = m.id === selectedId;
                   return (
