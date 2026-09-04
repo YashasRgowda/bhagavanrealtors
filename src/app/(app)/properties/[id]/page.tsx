@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { StatusPill } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { STATUS_META, PROPERTY_TYPES } from "@/lib/property/enums";
+import { PROPERTY_TYPES, statusLabel } from "@/lib/property/enums";
 import { formatINRShort } from "@/lib/format/currency";
 import { formatPhoneIN } from "@/lib/format/phone";
 import { locationDetail } from "@/lib/property/attributes";
@@ -67,7 +67,6 @@ export default async function PropertyDetailPage({
   const brandName = profile?.brand_name || profile?.full_name || "Bhagvan Realtors";
   const brandPhone = profile?.brand_phone || profile?.phone || null;
 
-  const meta = STATUS_META[prop.status];
   const typeLabel = (PROPERTY_TYPES[prop.category] as ReadonlyArray<{ value: string; label: string }>)
     .find(t => t.value === prop.property_type)?.label ?? prop.property_type;
 
@@ -90,7 +89,7 @@ export default async function PropertyDetailPage({
       {/* ── What it is ── */}
       <header className="min-w-0">
         <div className="flex flex-wrap items-center gap-2.5">
-          <StatusPill status={prop.status} label={meta.label} size="sm" />
+          <StatusPill status={prop.status} label={statusLabel(prop.status, prop.transaction_type)} size="sm" />
           <span className="text-micro uppercase text-ink-muted">{typeLabel}</span>
         </div>
         <h1 className="mt-3 text-display text-ink text-balance">{title}</h1>

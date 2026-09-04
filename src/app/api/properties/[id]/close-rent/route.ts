@@ -21,7 +21,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const { data: prop } = await supabase
     .from("properties")
-    .select("id, owner_user_id, transaction_type")
+    .select("id, owner_user_id, transaction_type, attributes")
     .eq("id", id)
     .single();
   if (!prop || prop.owner_user_id !== user.id) {
@@ -54,7 +54,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const closedStatus = prop.transaction_type === "lease" ? "leased" : "rented";
   const { error: pErr } = await supabase
     .from("properties")
-    .update({ status: "parked", attributes: { last_closed_as: closedStatus } })
+    // MERGE, never replace: assigning a fresh object to a jsonb column
+    // overwrites it, and this one holds every detail of the listing —
+    // facing, furnishing, floor, parking, notice period. Marking a rental
+    // rented was silently erasing all of it.
+    .update({
+      status: "parked",
+      attributes: { ...(prop.attributes ?? {}), last_closed_as: closedStatus },
+    })
     .eq("id", id)
     .eq("owner_user_id", user.id);
   if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });

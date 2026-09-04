@@ -3,12 +3,13 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { formatINRShort, formatINR } from "@/lib/format/currency";
 import { formatArea } from "@/lib/format/area";
 import { PROPERTY_TYPES } from "@/lib/property/enums";
+import { describeAttributes } from "@/lib/property/attributes";
 import type { ShareFields } from "@/lib/share/presets";
 import type { PropertyRow, PropertyMediaRow } from "@/lib/property/types";
 import { MapPin, ShieldCheck, Ban } from "lucide-react";
 import { RevealPhone } from "./RevealPhone";
 import { WhatsappShare } from "./WhatsappShare";
-import { PhotoWithWatermark } from "./PhotoWithWatermark";
+import { LightboxProvider, LightboxPhoto } from "./PhotoLightbox";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,10 @@ export default async function SharedListingPage({ params }: { params: Promise<{ 
     fields.city ? prop.city : null,
   ].filter(Boolean) as string[];
 
-  const extraPhotos = media.filter(m => m.type === "image").slice(1);
+  const photos = media
+    .filter(m => m.type === "image")
+    .map(m => ({ id: m.id, url: m.url, thumb_url: m.thumb_url }));
+  const extraPhotos = photos.slice(1);
 
   // Only the specs the dealer actually chose to share — the strip sizes itself
   // to however many that is, so it never renders half-empty.
@@ -87,6 +91,7 @@ export default async function SharedListingPage({ params }: { params: Promise<{ 
   ].filter(Boolean) as Array<{ label: string; value: string }>;
 
   return (
+    <LightboxProvider photos={photos} brand={brandName}>
     <div className="min-h-dvh bg-background text-foreground">
       {/* ─── Brand bar ─── */}
       <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-xl">
@@ -108,10 +113,13 @@ export default async function SharedListingPage({ params }: { params: Promise<{ 
 
       <main className="mx-auto max-w-3xl space-y-6 px-5 py-7">
         {/* ─── Hero ─── */}
-        {fields.photos && media.length > 0 && media[0].type === "image" ? (
-          <PhotoWithWatermark
-            src={media[0].url}
+        {fields.photos && photos.length > 0 ? (
+          <LightboxPhoto
+            index={0}
+            src={photos[0].url}
             brand={brandName}
+            alt={prop.title ?? typeLabel}
+            priority
             className="aspect-[4/3] overflow-hidden rounded-xl border border-border sm:aspect-[16/10]"
           />
         ) : fields.video && media.find(m => m.type === "video") ? (
@@ -173,18 +181,16 @@ export default async function SharedListingPage({ params }: { params: Promise<{ 
         {fields.attributes && prop.attributes && Object.keys(prop.attributes).length > 0 && (
           <section className="rounded-xl border border-border bg-card p-5">
             <h2 className="eyebrow border-b border-border pb-3">Details</h2>
+            {/* Through the label layer, not raw JSON keys: this page is what a
+                buyer sees, and "AGE YEARS 1" / "CARPET 2680" reads like a
+                database dump rather than a listing. */}
             <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
-              {Object.entries(prop.attributes)
-                .filter(([k, v]) => !k.startsWith("_") && v !== null && v !== "" && v !== undefined)
-                .slice(0, 18)
-                .map(([k, v]) => {
-                return (
-                  <div key={k} className="min-w-0">
-                    <dt className="eyebrow">{k.replace(/_/g, " ")}</dt>
-                    <dd className="mt-1.5 truncate text-sm font-medium capitalize">{String(v)}</dd>
-                  </div>
-                );
-              })}
+              {describeAttributes(prop.attributes).slice(0, 18).map(({ label, value }) => (
+                <div key={label} className="min-w-0">
+                  <dt className="eyebrow">{label}</dt>
+                  <dd className="mt-1.5 truncate text-sm font-medium" title={value}>{value}</dd>
+                </div>
+              ))}
             </dl>
           </section>
         )}
@@ -202,11 +208,13 @@ export default async function SharedListingPage({ params }: { params: Promise<{ 
         {/* ─── Gallery ─── */}
         {fields.photos && extraPhotos.length > 0 && (
           <section className="grid grid-cols-3 gap-2.5">
-            {extraPhotos.map(m => (
-              <PhotoWithWatermark
+            {extraPhotos.map((m, i) => (
+              <LightboxPhoto
                 key={m.id}
+                index={i + 1}
                 src={m.thumb_url || m.url}
                 brand={brandName}
+                alt={`${prop.title ?? typeLabel} — photo ${i + 2}`}
                 className="aspect-square overflow-hidden rounded-lg border border-border"
               />
             ))}
@@ -262,6 +270,7 @@ export default async function SharedListingPage({ params }: { params: Promise<{ 
         </footer>
       </main>
     </div>
+    </LightboxProvider>
   );
 }
 

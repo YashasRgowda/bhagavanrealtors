@@ -36,16 +36,73 @@ export const PROPERTY_TYPES = {
   ],
 } as const;
 
-export const STATUS_META: Record<string, { label: string; variant: "default"|"success"|"warning"|"danger"|"muted"|"outline" }> = {
-  available:   { label: "Available",     variant: "success" },
-  negotiating: { label: "Negotiating",   variant: "warning" },
-  token:       { label: "Token Received",variant: "warning" },
-  sold:        { label: "Sold",          variant: "muted"   },
-  rented:      { label: "Rented",        variant: "muted"   },
-  leased:      { label: "Leased",        variant: "muted"   },
-  parked:      { label: "Parked",        variant: "outline" },
-  withdrawn:   { label: "Withdrawn",     variant: "danger"  },
+/**
+ * What each status is called, and what it actually means.
+ *
+ * The words are deliberately plain. "Negotiating", "Parked" and "Withdrawn"
+ * are the app's internal names, not the ones a dealer standing outside a
+ * building uses — and a status picker nobody is sure about is a status nobody
+ * keeps up to date. `blurb` is shown under the picker so the choice never has
+ * to be guessed, and it always says where the property ends up: the Live list
+ * or the Archive, which are the two words already on the nav.
+ */
+export const STATUS_META: Record<string, {
+  label: string;
+  blurb: string;
+  variant: "default"|"success"|"warning"|"danger"|"muted"|"outline";
+}> = {
+  available: {
+    label: "Available", variant: "success",
+    blurb: "Ready to show. Stays on your Live list.",
+  },
+  negotiating: {
+    label: "In talks", variant: "warning",
+    blurb: "Price talks going on with someone. Stays on your Live list.",
+  },
+  token: {
+    label: "Token taken", variant: "warning",
+    blurb: "Advance money received. Stays on Live until you close the deal.",
+  },
+  sold: {
+    label: "Sold", variant: "muted",
+    blurb: "Deal done and money settled. Moves to Archive.",
+  },
+  rented: {
+    label: "Rented out", variant: "muted",
+    blurb: "Tenant has moved in. Moves to Archive.",
+  },
+  leased: {
+    label: "Leased out", variant: "muted",
+    blurb: "Lease finalised. Moves to Archive.",
+  },
+  parked: {
+    label: "Rented out", variant: "outline",
+    blurb: "Tenant has moved in. Moves to Archive \u2014 press \u201cVacant again\u201d when they leave.",
+  },
+  withdrawn: {
+    label: "Withdrawn", variant: "danger",
+    blurb: "Owner does not want to sell or rent now. Moves to Archive.",
+  },
 };
+
+/**
+ * The word for a status in the language of THIS deal.
+ *
+ * `parked` is the single state a rental ends up in, so it should be called
+ * what the button that sets it is called — "Rented out" on a rent, "Leased
+ * out" on a lease. One flat label cannot say both, so the deal type decides.
+ */
+export function statusLabel(status: string, txn?: string | null): string {
+  if (status === "parked" && txn === "lease") return "Leased out";
+  return STATUS_META[status]?.label ?? status;
+}
+
+export function statusBlurb(status: string, txn?: string | null): string {
+  if (status === "parked" && txn === "lease") {
+    return "Tenant has moved in. Moves to Archive \u2014 press \u201cVacant again\u201d when they leave.";
+  }
+  return STATUS_META[status]?.blurb ?? "";
+}
 
 export const LIVE_STATUSES = ["available", "negotiating", "token"] as const;
 export const CLOSED_STATUSES = ["sold", "rented", "leased", "parked", "withdrawn"] as const;

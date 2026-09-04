@@ -37,7 +37,7 @@ const SPEC: Array<[key: string, label: string, format?: Formatter]> = [
   ["furnishing",       "Furnishing", enumLabel({
     unfurnished: "Unfurnished", semi: "Semi-furnished", fully: "Fully furnished",
   })],
-  ["age_years",        "Age", v => (Number(v) === 0 ? "Brand new" : `${v} years`)],
+  ["age_years",        "Age", v => (Number(v) === 0 ? "Brand new" : `${v} year${Number(v) === 1 ? "" : "s"}`)],
   ["parking_4w",       "Car parking", v => `${v} slot${Number(v) === 1 ? "" : "s"}`],
   ["parking_2w",       "Bike parking", v => `${v} slot${Number(v) === 1 ? "" : "s"}`],
 

@@ -7,7 +7,7 @@ import { StatusPill } from "@/components/ui/badge";
 import { Money } from "@/components/ui/money";
 import { PlateImage } from "@/components/ui/plate-image";
 import { formatArea } from "@/lib/format/area";
-import { STATUS_META, PROPERTY_TYPES } from "@/lib/property/enums";
+import { PROPERTY_TYPES, statusLabel } from "@/lib/property/enums";
 import { layoutIds, useMotionPrefs } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { PropertyRow, PropertyMediaRow } from "@/lib/property/types";
@@ -23,7 +23,6 @@ export function PropertyCard({
   priority?: boolean;
 }) {
   const m = useMotionPrefs();
-  const meta = STATUS_META[p.status];
 
   const typeLabel =
     (PROPERTY_TYPES[p.category] as ReadonlyArray<{ value: string; label: string }>)
@@ -75,7 +74,7 @@ export function PropertyCard({
           </motion.div>
 
           <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-            <StatusPill status={p.status} label={meta.label} onPhoto size="sm" />
+            <StatusPill status={p.status} label={statusLabel(p.status, p.transaction_type)} onPhoto size="sm" />
             {p.is_featured && (
               <span className="inline-flex h-6 items-center rounded-full bg-accent px-2 text-xs font-medium text-accent-fg shadow-sm">
                 Hot
